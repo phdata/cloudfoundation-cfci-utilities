@@ -21,6 +21,7 @@ build_failed="BUILD FAILED. Review the below log:   $nl_sep "
 repo_path=$(basename "$(dirname "$CODEBUILD_SRC_DIR")")/$(basename "$CODEBUILD_SRC_DIR")
 repo_home=$(basename "$CODEBUILD_SRC_DIR")
 api_url="https://api.bitbucket.org/2.0/repositories"
+github_api_url="https://api.github.com/repos"
 pr_id=`sed -e 's#.*/\(\)#\1#' <<< "$CODEBUILD_WEBHOOK_TRIGGER"` #get PR id
 summary_label="DEPLOY PLAN for environment:"
 rc_label="Stack is in ROLLBACK_COMPLETE state. CFCI will DELETE this stack and try to RECREATE it"
@@ -859,7 +860,7 @@ post_pr_comment() {
     elif [ "$repo_type" = "github" ]; then
         curl -s --header "Authorization: token ${access_token}" \
          -X POST -d '{"body": "'"${1//$'\n'/'\n'}"'"}' \
-         "https://api.github.com/repos/phdata/cloudfoundation-demo/issues/$pr_id/comments"
+         "$github_api_url/$owner_repo/issues/$pr_id/comments"
     fi
     
 }
@@ -892,7 +893,14 @@ get_pr_details() {
             | jq -r '.state'`
         head_branch=`git name-rev --name-only $CODEBUILD_RESOLVED_SOURCE_VERSION`
     elif [ "$repo_type" = "github" ]; then
-        pr_id=`sed -e 's#.*/\(\)#\1#' <<< "$CODEBUILD_SOURCE_VERSION"`
+        if [[ "$CODEBUILD_INITIATOR" == "codepipeline/"* ]]; then
+            pr_id=`curl --silent \
+                    -H "Accept: application/vnd.github.groot-preview+json" \
+                    -H "Authorization: token ${access_token}" \
+                    $github_api_url/$owner_repo/commits/$CODEBUILD_RESOLVED_SOURCE_VERSION/pulls | jq -r '.[].number'`
+        else 
+            pr_id=`sed -e 's#.*/\(\)#\1#' <<< "$CODEBUILD_SOURCE_VERSION"`
+        fi
     fi
 }
 
