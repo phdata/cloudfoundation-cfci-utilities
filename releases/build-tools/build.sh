@@ -764,7 +764,7 @@ changeset_action() {
 
 #reads sceptre output into a string, this is required as bit bucket doesnt accept multiline comment
 format_change_output () {
-    # if [ "$repo_type" = "BITBUCKET" ]; then
+    # if [ "$repo_type" = "bitbucket" ]; then
         stack_changes=""
         set +x
         while read -r LINE
@@ -772,7 +772,7 @@ format_change_output () {
         #temp fix to escape special char's handle it in a  better way later
         # LINE=$(sed -E 's/\//\\\//g' <<<"${LINE}") #escape /
         LINE=$(sed -E 's/\\/\\\\/g' <<<"${LINE}") #escape \ 
-        if [ "$repo_type" = "BITBUCKET" ]; then
+        if [ "$repo_type" = "bitbucket" ]; then
             stack_changes="${stack_changes} $nl_sep ${LINE//\"/\\\"}" #add esc char for " and append to string
         else
             stack_changes="${stack_changes} $nl_sep ${LINE}"
@@ -838,6 +838,7 @@ stack_status_report() {
 
 #post comment to PR
 post_pr_comment() {
+    
     if [ "$repo_type" = "CODECOMMIT" ]; then
         echo "$1" > comments
         awk '{gsub(/\\n/,"\n")}1' comments > newlinecomment
@@ -850,12 +851,17 @@ post_pr_comment() {
         echo "https://console.aws.amazon.com/codesuite/codecommit/repositories/$(basename $CODEBUILD_SRC_DIR)/pull-requests/$pull_request_id" >> newlinecomment
         subject="[codecommit] Pull request #$pull_request_id: $pr_title ($(basename $CODEBUILD_SRC_DIR))"
         aws ses send-email --from "$from_address" --to ${to_address} --text file://newlinecomment --subject "$subject"
-    elif [ "$repo_type" = "BITBUCKET" ]; then
+    elif [ "$repo_type" = "bitbucket" ]; then
         curl --silent -u $bb_app_user:$bb_app_pwd $api_url/$repo_path/pullrequests/$pr_id/comments \
         --request POST \
         --header 'Content-Type: application/json' \
         --data "{\"content\": { \"raw\": \"$1\" }}" > /dev/null
+    elif [ "$repo_type" = "github" ]; then
+        curl -s --header "Authorization: token ${access_token}" \
+         -X POST -d '{"body": "'"${1//$'\n'/'\n'}"'"}' \
+         "https://api.github.com/repos/phdata/cloudfoundation-demo/issues/$pr_id/comments"
     fi
+    
 }
 
 #decline PR 
@@ -879,12 +885,14 @@ fi
 }
 
 get_pr_details() {
-    if [ "$repo_type" = "BITBUCKET" ]; then
+    if [ "$repo_type" = "bitbucket" ]; then
         pr_id=`curl --silent -u $bb_app_user:$bb_app_pwd $api_url/$repo_path/commit/$CODEBUILD_RESOLVED_SOURCE_VERSION/pullrequests \
             | jq -r '.values[0].id'`
         pr_status=`curl --silent -u $bb_app_user:$bb_app_pwd $api_url/$repo_path/pullrequests/$pr_id \
             | jq -r '.state'`
         head_branch=`git name-rev --name-only $CODEBUILD_RESOLVED_SOURCE_VERSION`
+    elif [ "$repo_type" = "github" ]; then
+        echo "TB updated"
     fi
 }
 
@@ -1025,17 +1033,19 @@ fi
 
 # this block is for codecommit support. repo_type is set in cloudfoundation lambda function for codecommit
 if [[ -z "${repo_type}" ]]; then
-    repo_type="BITBUCKET"
+    repo_type="bitbucket"
+fi
+
+# CODEBUILD_WEBHOOK_EVENT is set only when webhooks are used, set appropriate value  for codecommit build.
+if [ "$repo_type" = "CODECOMMIT" ]; then
+    CODEBUILD_WEBHOOK_EVENT=$request_type
+    # request_type is set in cloudfoundation lambda function for codecommit
+elif [ "$repo_type" = "github" ] || [ "$repo_type" = "github" ] ; then
+    nl_sep=" <br> "
 fi
 
 # build stage from build spec file
 if [ "$stage" = "build" ]; then
-
-    # CODEBUILD_WEBHOOK_EVENT is set only when webhooks are used, set appropriate value  for codecommit build.
-    if [ "$repo_type" = "CODECOMMIT" ]; then
-        CODEBUILD_WEBHOOK_EVENT=$request_type
-        # request_type is set in cloudfoundation lambda function for codecommit
-    fi
 
     #check for deployment descriptor file OR set default file name
     if [[ -z "${deployment_decriptor}" ]]; then
@@ -1086,7 +1096,7 @@ if [ "$stage" = "build" ]; then
     else    
      # for src code repos supporting webhooks, get CODEBUILD_WEBHOOK_EVENT (supported types: PULL_REQUEST_UPDATED | PULL_REQUEST_CREATED)
         case $CODEBUILD_WEBHOOK_EVENT in
-            PULL_REQUEST_UPDATED | PULL_REQUEST_CREATED)
+            PULL_REQUEST_UPDATED | PULL_REQUEST_CREATED | PULL_REQUEST_REOPENED)
                 process_plan
                 ;;
 
@@ -1095,7 +1105,7 @@ if [ "$stage" = "build" ]; then
                 ;;
             *)
                 if [ -z "$CODEBUILD_WEBHOOK_EVENT" ] ; then
-                    if [ "$repo_type" = "BITBUCKET" ]; then
+                    if [ "$repo_type" = "bitbucket" ]; then
                         get_pr_details
                         if [ "$pr_status" == "MERGED" ] || [ "$pr_status" == "Closed" ]; then
                             #cfci_deploy
@@ -1112,7 +1122,7 @@ if [ "$stage" = "build" ]; then
         esac
     fi
 elif [ "$stage" == "post_build" ] && [ "$CODEBUILD_BUILD_SUCCEEDING" -eq 0 ] ; then
-    if [ "$repo_type" = "BITBUCKET" ]; then
+    if [ "$repo_type" = "bitbucket" ]; then
         get_pr_details
     fi
     format_change_output output
