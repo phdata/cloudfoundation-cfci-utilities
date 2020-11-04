@@ -892,7 +892,7 @@ get_pr_details() {
             | jq -r '.state'`
         head_branch=`git name-rev --name-only $CODEBUILD_RESOLVED_SOURCE_VERSION`
     elif [ "$repo_type" = "github" ]; then
-        echo "TB updated"
+        pr_id=`sed -e 's#.*/\(\)#\1#' <<< "$CODEBUILD_SOURCE_VERSION"`
     fi
 }
 
