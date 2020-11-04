@@ -1122,7 +1122,7 @@ if [ "$stage" = "build" ]; then
         esac
     fi
 elif [ "$stage" == "post_build" ] && [ "$CODEBUILD_BUILD_SUCCEEDING" -eq 0 ] ; then
-    if [ "$repo_type" = "bitbucket" ]; then
+    if [ "$repo_type" = "bitbucket" ] || [ "$repo_type" = "github" ] ; then
         get_pr_details
     fi
     format_change_output output
