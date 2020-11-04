@@ -13,7 +13,7 @@
 set -e
 
 # variables/ labels
-prefix="phData-CFCI build:"
+prefix="phData-CFCI build: "
 nl_sep="  \\n "
 head_branch=`echo "${CODEBUILD_WEBHOOK_HEAD_REF#*heads/}"`  #branch name through which the PR is created
 more_details=" $nl_sep $nl_sep BUILD Log: $nl_sep "$CODEBUILD_BUILD_URL
@@ -772,7 +772,7 @@ format_change_output () {
         #temp fix to escape special char's handle it in a  better way later
         # LINE=$(sed -E 's/\//\\\//g' <<<"${LINE}") #escape /
         LINE=$(sed -E 's/\\/\\\\/g' <<<"${LINE}") #escape \ 
-        if [ "$repo_type" = "bitbucket" ]; then
+        if [ "$repo_type" = "bitbucket" ] || [ "$repo_type" = "github" ] ; then
             stack_changes="${stack_changes} $nl_sep ${LINE//\"/\\\"}" #add esc char for " and append to string
         else
             stack_changes="${stack_changes} $nl_sep ${LINE}"
