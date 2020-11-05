@@ -303,7 +303,11 @@ pull_templates() {
 # check if template exist in artifactory. status 200 is true. else false
 check_template_exist() {
     url=$1
-    check_url=$(curl -u$artifactory_usr:$artifactory_pwd -s -o /dev/null -w "%{http_code}" ${url})
+    if [ "$quickstart" = true ]; then
+        check_url=$(curl -s -o /dev/null -w "%{http_code}" ${url})
+    else
+        check_url=$(curl -u$artifactory_usr:$artifactory_pwd -s -o /dev/null -w "%{http_code}" ${url})
+    fi
     echo "http_code:$check_url"
     case $check_url in
     [200]*)
@@ -340,7 +344,11 @@ download_artifactory_template() {
         if [ "$download" = true ];then
         echo "Downloading: $artfct_uri"
         echo "using phData-gold-template: $artfct_uri"  > artf
-        curl -u$artifactory_usr:$artifactory_pwd -O $artfct_uri
+        if [ "$quickstart" = true ]; then
+            curl -O $artfct_uri
+        else
+            curl -u$artifactory_usr:$artifactory_pwd -O $artfct_uri
+        fi
         if [[ "$template_path" == *\/* ]] ; then
         template_dir="$CI_PROJECT_DIR/$project/templates/${artfct_template_path%/*}"
         else
@@ -762,7 +770,7 @@ changeset_action() {
 
 #reads sceptre output into a string, this is required as bit bucket doesnt accept multiline comment
 format_change_output () {
-    # if [ "$repo_type" = "BITBUCKET" ]; then
+    # if [ "$repo_type" = "bitbucket" ]; then
         stack_changes=""
         set +x
         while read -r LINE
@@ -770,7 +778,7 @@ format_change_output () {
         #temp fix to escape special char's handle it in a  better way later
         # LINE=$(sed -E 's/\//\\\//g' <<<"${LINE}") #escape /
         LINE=$(sed -E 's/\\/\\\\/g' <<<"${LINE}") #escape \ 
-        if [ "$repo_type" = "BITBUCKET" ]; then
+        if [ "$repo_type" = "bitbucket" ] || [ "$repo_type" = "github" ] ; then
             stack_changes="${stack_changes} $nl_sep ${LINE//\"/\\\"}" #add esc char for " and append to string
         else
             stack_changes="${stack_changes} $nl_sep ${LINE}"
@@ -1010,7 +1018,14 @@ fi
 if [ "$stage" = "post_build" ]; then
     source variables_file
 fi
-# printenv
+
+if [[ -z "${quickstart}" ]]; then
+    quickstart="false"
+fi
+
+if [ "$quickstart" = true ]; then
+    artifactory_base_url=https://repository.phdata.io/artifactory/cf-demo-templates/
+fi
 
 if [ "$stage" = "build" ]; then
     echo "CODEBUILD_BUILD_SUCCEEDING=true" >> variables_file

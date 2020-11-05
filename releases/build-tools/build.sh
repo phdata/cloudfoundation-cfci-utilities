@@ -306,7 +306,11 @@ pull_templates() {
 # check if template exist in artifactory. status 200 is true. else false
 check_template_exist() {
     url=$1
-    check_url=$(curl -u$artifactory_usr:$artifactory_pwd -s -o /dev/null -w "%{http_code}" ${url})
+    if [ "$quickstart" = true ]; then
+        check_url=$(curl -s -o /dev/null -w "%{http_code}" ${url})
+    else
+        check_url=$(curl -u$artifactory_usr:$artifactory_pwd -s -o /dev/null -w "%{http_code}" ${url})
+    fi
     echo "http_code:$check_url"
     case $check_url in
     [200]*)
@@ -343,7 +347,11 @@ download_artifactory_template() {
         if [ "$download" = true ];then
         echo "Downloading: $artfct_uri"
         echo "using phData-gold-template: $artfct_uri"  > artf
-        curl -u$artifactory_usr:$artifactory_pwd -O $artfct_uri
+        if [ "$quickstart" = true ]; then
+            curl -O $artfct_uri
+        else
+            curl -u$artifactory_usr:$artifactory_pwd -O $artfct_uri
+        fi
         if [[ "$template_path" == *\/* ]] ; then
         template_dir="$CODEBUILD_SRC_DIR/$project/templates/${artfct_template_path%/*}"
         else
@@ -1043,6 +1051,15 @@ fi
 if [[ -z "${repo_type}" ]]; then
     repo_type="bitbucket"
 fi
+
+if [[ -z "${quickstart}" ]]; then
+    quickstart="false"
+fi
+
+if [ "$quickstart" = true ]; then
+    artifactory_base_url=https://repository.phdata.io/artifactory/cf-demo-templates/
+fi
+
 
 # CODEBUILD_WEBHOOK_EVENT is set only when webhooks are used, set appropriate value  for codecommit build.
 if [ "$repo_type" = "CODECOMMIT" ]; then
