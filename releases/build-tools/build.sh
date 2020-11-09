@@ -1,13 +1,19 @@
 #!/bin/bash -x
-# v 1.0.0 - Initial version for cloudfoundation build 
-# v 1.0.1 - script to identify the changes from previous commit and execute the build commands
-# v 1.0.2 - add support to change multiple stacks at once
-# v 1.0.3 - fixed multiple issues and added enhancements, review jira WOLK-41
-# v 1.0.4 - Remove dependencies on git delta
-# v 1.0.5 - seperate gold templates and add deployment descriptor to define CFCI actions
-# v 1.2.0 - support for codecommit as sourcecode repository
-# v 1.3.0 - Account best practices - deploy in multi environments
-# v 1.4.0 - support for gitlab as sourcecode repository and gitlab CI as build tool.
+
+#  Copyright 2018 phData Inc.
+# 
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+# 
+#  http://www.apache.org/licenses/LICENSE-2.0
+# 
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
 
 #shell options 
 set -e
