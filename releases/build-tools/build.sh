@@ -958,7 +958,7 @@ configure_aws_environment() {
             # deploy_environment is set in codepipeline, basically this condition is check if build triggered by webhook OR pipeline
             # if deploy_environment is not set the build is triggered by webhooks 
             if [[ -z "${deploy_environment}" ]]; then
-                if [[ "$CODEBUILD_INITIATOR" == "codepipeline/"* ]]
+                if [[ "$CODEBUILD_INITIATOR" == "codepipeline/"* ]]; then
                     echo "BUILD Error: you must set deploy_environment environment variable when you have multiple environments in your pipeline" > output
                     exit 1
                 else
