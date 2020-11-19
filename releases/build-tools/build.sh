@@ -43,7 +43,7 @@ download=true
 no_changeset=false
 pipelinename=`echo $CODEBUILD_INITIATOR | cut -d'/' -f2-`
 codepipeline_base_url="https://console.aws.amazon.com/codesuite/codepipeline/pipelines/$pipelinename/view?region=$AWS_DEFAULT_REGION"
-more_details_with_appr=" $nl_sep  $nl_sep Pipeline Approval Link - use the below link to approve the DEPLOY operation for this environment:  $nl_sep (Before you approve, make sure the Pipeline execution ID is matching for all stages) $nl_sep $codepipeline_base_url $nl_sep  $nl_sep BUILD Log: $nl_sep "$CODEBUILD_BUILD_URL
+more_details_with_appr=" $nl_sep  $nl_sep If you have a manual approval configured for this environment: $nl_sep Use the below link to approve the DEPLOY operation for this environment:  $nl_sep (Before you approve, make sure the Pipeline execution ID is matching for all stages) $nl_sep $codepipeline_base_url $nl_sep  $nl_sep BUILD Log: $nl_sep "$CODEBUILD_BUILD_URL
 note_summary="This note contains:"
 plan_all_note="As the plan_all attribute is set to true in buildspec file, DEPLOY PLAN is generated for all defined environments "
 
