@@ -242,8 +242,8 @@ validate_deployment_descriptor() {
                 if [ "$env_status" -eq 0 ]  || [ "$all_status" -eq 0 ]; then
                     # check if dependent stacks are listed for a stack
                     cd ..
-                    current_stack="$env/${stack_name_with_ext}"
-                    python graph.py $project $env $current_stack
+                    current_stack="${stack_name_with_ext}"
+                    python graph.py $project $env "$env/${stack_name_with_ext%.*}"
                     cp stack_graph $project
                     cd $project
                     while read -r dep_stack
@@ -338,7 +338,7 @@ check_template_exist() {
 download_artifactory_template() {
     template_exist=""
     #template path from stack file
-    template_path_string=`grep "template_path" config/$1 | head -1`
+    template_path_string=`grep "template_path" config/$env/$1 | head -1`
     #template_path value from stack file
     template_path=`echo $template_path_string | cut -d':' -f2-`
     # remove line comment at the end and trim template path
