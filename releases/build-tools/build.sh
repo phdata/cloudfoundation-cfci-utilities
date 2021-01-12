@@ -242,7 +242,7 @@ validate_deployment_descriptor() {
                 if [ "$env_status" -eq 0 ]  || [ "$all_status" -eq 0 ]; then
                     # check if dependent stacks are listed for a stack
                     cd ..
-                    current_stack="$env/${stack_name_with_ext%.*}"
+                    current_stack="$env/${stack_name_with_ext}"
                     python graph.py $project $env $current_stack
                     cp stack_graph $project
                     cd $project
