@@ -832,7 +832,7 @@ stack_status_report() {
         echo $dependency_label > output
         cat stack_status_report >> output
         exit 1 
-    elif grep "Traceback " stack_status_report ; thena
+    elif grep "Traceback " stack_status_report ; then
         echo $syntax_err_label > output
         echo "" >> output
         cat stack_status_report >> output
