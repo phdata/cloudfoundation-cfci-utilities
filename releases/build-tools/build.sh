@@ -250,7 +250,7 @@ validate_deployment_descriptor() {
                     
                         if ! grep -q ":$dep_stack" deploy_tmp ; then
                             no_changeset=true
-                            get_stack_action ${dep_stack%.*} $block
+                            get_stack_action $env/${dep_stack%.*} $block
                             no_changeset=false
                             if [[ $stack_action = "A" ]]; then
                                 if [ "$block_printed" = false ];then
