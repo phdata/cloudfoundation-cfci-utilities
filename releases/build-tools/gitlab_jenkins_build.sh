@@ -1,3 +1,4 @@
+
 #!/bin/bash -x
 
 #  Copyright 2018 phData Inc.
@@ -19,13 +20,14 @@
 set -e
 
 # variables/ labels
+delete_this="TEST"
 prefix="phData-CFCI build:"
 nl_sep=" <br> "
 # head_branch=`echo "${CODEBUILD_WEBHOOK_HEAD_REF#*heads/}"`  #branch name through which the PR is created
-more_details=" $nl_sep $nl_sep BUILD Log:  $nl_sep "$CI_JOB_URL
+more_details=" $nl_sep $nl_sep BUILD Log:  $nl_sep "$BUILD_URL"console"
 build_failed="BUILD FAILED. Review the below log:   $nl_sep "
-repo_path=$(basename "$(dirname "$CI_PROJECT_DIR")")/$(basename "$CI_PROJECT_DIR")
-repo_home=$(basename "$CI_PROJECT_DIR")
+repo_path=$(basename "$(dirname "$WORKSPACE")")/$(basename "$WORKSPACE")
+repo_home=$(basename "$WORKSPACE")
 summary_label="DEPLOY PLAN for environment:"
 rc_label="Stack is in ROLLBACK_COMPLETE state. CFCI will DELETE this stack and try to RECREATE it"
 multi_env_label="Multiple deploy environments are defined in your deployment descriptor.  $nl_sep Cloudfoundation will deploy stacks in all defined enviroments, change the stack level deploy_env attribute to include OR skip an environment."
@@ -39,10 +41,9 @@ artifactory_base_url=https://repository.phdata.io/artifactory/cf-gold-templates/
 download=true
 no_changeset=false
 pipelinename=`echo $CODEBUILD_INITIATOR | cut -d'/' -f2-`
-codepipeline_base_url="https://console.aws.amazon.com/codesuite/codepipeline/pipelines/$pipelinename/view?region=$AWS_DEFAULT_REGION"
-more_details_with_appr=" $nl_sep  $nl_sep Use the below link to approve the DEPLOY operation for this environment:  $nl_sep $CI_PIPELINE_URL $nl_sep $nl_sep BUILD Log:  $nl_sep "$CI_JOB_URL
+more_details_with_appr=" $nl_sep  $nl_sep Use the below link to approve the DEPLOY operation for this environment:  $nl_sep $CI_PIPELINE_URL $nl_sep $nl_sep BUILD Log:  $nl_sep "$BUILD_URL"console"
 note_summary="This note contains:"
-plan_all_note="As the plan_all attribute is set to true in gitlab-ci file, DEPLOY PLAN is generated for all defined environments "
+plan_all_note="As the plan_all attribute is set to true in Jenkinsfile, DEPLOY PLAN is generated for all defined environments "
 
 # validate deployment descriptor
 validate_deployment_descriptor() {
@@ -165,6 +166,7 @@ validate_deployment_descriptor() {
                                 echo "" >> descriptor_errors
                                 echo "**$block:$deploy_stack**" >> descriptor_errors
                     fi
+                    echo "path is:"`pwd`
                     echo "ERROR: stack file :$stack_name_with_ext specified in the deployment descriptor doesn't exist." >> descriptor_errors
                 fi
             fi
@@ -312,7 +314,7 @@ check_template_exist() {
     if [ "$quickstart" = true ]; then
         check_url=$(curl -s -o /dev/null -w "%{http_code}" ${url})
     else
-        check_url=$(curl -u$artifactory_usr:$artifactory_pwd -s -o /dev/null -w "%{http_code}" ${url})
+        check_url=$(curl -u$phdata_artifactory_user:$phdata_artifactory_secret -s -o /dev/null -w "%{http_code}" ${url})
     fi
     echo "http_code:$check_url"
     case $check_url in
@@ -353,12 +355,12 @@ download_artifactory_template() {
         if [ "$quickstart" = true ]; then
             curl -O $artfct_uri
         else
-            curl -u$artifactory_usr:$artifactory_pwd -O $artfct_uri
+            curl -u$phdata_artifactory_user:$phdata_artifactory_secret -O $artfct_uri
         fi
         if [[ "$template_path" == *\/* ]] ; then
-        template_dir="$CI_PROJECT_DIR/$project/templates/${artfct_template_path%/*}"
+        template_dir="$WORKSPACE/$project/templates/${artfct_template_path%/*}"
         else
-        template_dir="$CI_PROJECT_DIR/$project/templates"
+        template_dir="$WORKSPACE/$project/templates"
         fi
         # mkdir -p $CODEBUILD_${artfct_template_path%/*}
         mkdir -p $template_dir
@@ -550,14 +552,6 @@ function cfci_deploy (){
         stack_name_with_ext=$(jq -r '.name' <<< "$deploy_stack")
         # stack=`echo $deploy_stack | awk -F ".yaml-" '{ print $1 }'`
         stack="${stack_name_with_ext%.*}" #remove extenstion - needed when template version is not specified in the descriptor
-        # template_version=`echo $deploy_stack | awk -F ".yaml-" '{ print $2 }'`
-        # stack_name_with_ext="$stack.yaml"
-        # cd ..
-        # python graph_$cfci_version.py $project $env "$stack"
-        # cat stack_graph
-        
-        # cp stack_graph $project
-        # cd $project
 
         # check if current environment exist in deploy_env
         switch_set_e
@@ -680,6 +674,7 @@ write_comments_file () {
 }
 
 get_stack_action () {
+    echo "cwd is"`pwd`
     stack_status=$(jq --arg stack "$1" -c '.[$stack]' stack_status_report)
     traceback=false
     stack_name_rem_slash=`sed -e 's#.*/\(\)#\1#' <<< "$1"`
@@ -850,7 +845,9 @@ stack_status_report() {
 
 #post comment to PR
 post_pr_comment() {
-    curl -s -X POST --header "PRIVATE-TOKEN: $GITLAB_SVC_ACCOUNT_TOKEN" -d "body=${1}" $api_url
+    switch_set_e
+    curl -s -X POST --header "PRIVATE-TOKEN: $GITLAB_SVC_ACCNT_TOKEN" -d "body=${1}" $api_url/notes
+    switch_set_e
 }
 
 #decline PR 
@@ -876,17 +873,33 @@ fi
 exit_and_set_build_status() {
     # export CODEBUILD_BUILD_SUCCEEDING=false
     echo "CODEBUILD_BUILD_SUCCEEDING=false" >> variables_file
-    exit 0
+    exit 1
 }
 
 get_pr_details() {
-
-        if [ "$pr_status" == "OPEN" ]; then 
-            pr_id=`git ls-remote ${CI_REPOSITORY_URL} refs/merge-requests/[0-9]*/head | awk "/$CI_COMMIT_SHA/"'{print $2}' | cut -d '/' -f3`
-        elif [ "$pr_status" == "MERGED" ]; then 
-            pr_id=`echo $CI_COMMIT_MESSAGE | grep "See merge request" | cut -d "!" -f2-`
+            
+        api_url="https://gitlab.com/api/v4/projects/$gitlabMergeRequestTargetProjectId/merge_requests/$gitlabMergeRequestIid"
+        # mr_status=`curl -s -X GET --header "PRIVATE-TOKEN: $GITLAB_SVC_ACCNT_TOKEN" $api_url/resource_state_events | jq -r '.[].state'`
+        # if [ "$pr_status" == "MERGED" ] && [ "$mr_status" != "merged" ]; then 
+        # echo "WARNING:DEPLOY Operation requested but merge-request is not merged into master yet" > output
+        # echo "Terminating build operation." >> output
+        # exit_and_set_build_status
+        # fi
+        if [ "$pr_status" == "DEPLOY" ]; then
+            approved_status=`curl -s -X GET --header "PRIVATE-TOKEN: $GITLAB_SVC_ACCNT_TOKEN" $api_url/approvals | jq -r '.approved_by'`
+            if [ "$approved_status" == "[]" ]; then 
+            echo "WARNING:DEPLOY Operation requested, but the merge-request is not appproved yet" > output
+            echo "Terminating build operation." >> output
+            exit_and_set_build_status
+            fi
         fi
-        api_url="https://gitlab.com/api/v4/projects/$CI_PROJECT_ID/merge_requests/$pr_id/notes"
+
+        # if [ "$gitlabMergeRequestState" == "opened" ]; then 
+        #     pr_id=`git ls-remote ${gitlabSourceRepoHttpUrl} refs/merge-requests/[0-9]*/head | awk "/$GIT_COMMIT/"'{print $2}' | cut -d '/' -f3`
+        # elif [ "$gitlabMergeRequestState" == "merged" ]; then 
+        #     pr_id=`echo $CI_COMMIT_MESSAGE | grep "See merge request" | cut -d "!" -f2-`
+        # fi
+        
         # pr_status=`curl --silent -u $bb_app_user:$bb_app_pwd $api_url/$repo_path/pullrequests/$pr_id \
         #     | jq -r '.state'`
         # head_branch=`git name-rev --name-only $CODEBUILD_RESOLVED_SOURCE_VERSION`
@@ -897,81 +910,29 @@ get_pr_details() {
 # No arg - then if $env exist configure the next env from deploy_environments else set the matching env for deploy_environment which is defined as codepipeline env variable
 configure_aws_environment() {
    
-    # account where the build is configured
-    if [ -z "$caller_account" ];then
-        # export ORIG_ACCOUNT=$caller_account
-        caller_account=`aws sts get-caller-identity | jq -r .Account`
-        aws sts assume-role --role-arn arn:aws:iam::$caller_account:role/cloudfoundation-admin --role-session-name cloufoundationAdmin > sts_caller.json
-        export_aws_var sts_caller.json
-    fi
+   #export cred for requested env
+   eval key_name=\$AWS_ACCESS_KEY_ID_$env_name 
+   eval secret_name=\$AWS_SECRET_ACCESS_KEY_$env_name 
+   export AWS_ACCESS_KEY_ID=$key_name
+   export AWS_SECRET_ACCESS_KEY=$secret_name
 
-    # if fun() arg is "caller" switch to original account/caller where the pipeline is configured 
-    if [ "$1" == "caller" ];then
-        export_aws_var sts_caller.json
-        return
-    elif [ "$1" == "env" ];then
-        if [[ -z "$env" ]]; then
-            export prev_env=$env_name
-        else
-            export prev_env=$env
-        fi
-        export env=$env_name
-        aws sts assume-role --role-arn arn:aws:iam::$account_id:role/cloudfoundation-admin --role-session-name cloufoundationAdmin > sts.json
-        export_aws_var sts.json
-        env_detail="Environment name: $env_name | Account-Id: $account_id"
-        env_separator="============================ENVIRONMENT:$env_name============================"
-        return
-    fi
+   #caller_account=`aws sts get-caller-identity | jq -r .Account`
+   #assume role for requested env
+   AWS_SESSION_TOKEN=""
+   aws sts assume-role --role-arn arn:aws:iam::$account_id:role/cloudfoundation-admin --role-session-name cloufoundationAdmin > sts_caller.json
+   export_aws_var sts_caller.json
+   
+   if [ -z "$env" ];then
+    env=$env_name
+   else 
+    previous_env_detail=$env_detail
+    previous_env_separator="============================ENVIRONMENT:$env============================"
+    prev_env=$env
+    env=$env_name
+   fi
 
-    if [ -z "$env" ];then
-        while read -r environment
-        do  
-            env_name=$(jq -r '.name' <<< "$environment")
-            account_id=$(jq -r '.account_id' <<< "$environment")
-            # region=$(jq -r '.region' <<< "$environment")
-            
-            # deploy_environment is set in codepipeline, basically this condition is check if build triggered by webhook OR pipeline
-            # if deploy_environment is not set the build is triggered by webhooks 
-            if [[ -z "${deploy_environment}" ]]; then
-                break
-            elif [ "$deploy_environment" == "$env_name" ]; then
-            # this means we are at the right environment entry, no need to continue
-                break
-            fi
-        done < deploy_environments
-        # deploy_environments is a file generated by parser with all environments defined by cust in deployment descriptor
-
-    else
-        current_env=false
-        next_env=false
-        while read -r environment
-        do
-        env_name=$(jq -r '.name' <<< "$environment")
-        account_id=$(jq -r '.account_id' <<< "$environment")
-        
-        if [ "$current_env" = true ];then
-            next_env=true
-            break
-        fi
-        if [ "$env_name" == "$env" ]; then
-            current_env=true
-        fi
-        done < deploy_environments
-    fi
-
-    if [[ -z "$env" ]]; then
-        export prev_env=$env_name
-    else
-    export prev_env=$env
-    fi
-    export env=$env_name
-    #check if caller is same as deploy_env else use assume role.
-    if [ "$account_id" != "$caller_account" ]; then
-        aws sts assume-role --role-arn arn:aws:iam::$account_id:role/cloudfoundation-admin --role-session-name cloufoundationAdmin > sts.json
-        export_aws_var sts.json
-    fi
-    env_detail="Environment name: $env_name | Account-Id: $account_id"
-    env_separator="============================ENVIRONMENT:$env_name============================"
+   env_detail="Environment name: $env_name | Account-Id: $account_id"
+   env_separator="============================ENVIRONMENT:$env_name============================"
 }
 
 export_aws_var () {
@@ -995,30 +956,36 @@ process_plan () {
 if [ -z "$plan_all" ] ; then
     plan_all=false
 fi
-if [ "$plan_all" = false ] || [ "$env_count" -lt 2 ] ; then
-    cfci_plan
-    note_summary="$note_summary $nl_sep 1) DEPLOY PLAN for environment: $env"
-    process_plan_comments
-elif [ "$plan_all" = true ]; then
-    index=0
+
+index=0
     while read -r environment
-    do  
+    do
         env_name=$(jq -r '.name' <<< "$environment")
         account_id=$(jq -r '.account_id' <<< "$environment")
-        configure_aws_environment "env"
-        if [ "$index" -gt 0 ]; then
-            stack_status_report
-            validate_deployment_descriptor
-        fi
+        configure_aws_environment
+        # get stack status and validate deployment descriptor
+        stack_status_report
+        validate_deployment_descriptor
         cfci_plan
-        plan_comments="$plan_comments$env_separator $nl_sep $env_detail $nl_sep $plan_comment $nl_sep  $nl_sep "
-        let index+=1
-        configure_aws_environment "caller"
-        note_summary="$note_summary $nl_sep $index) DEPLOY PLAN for environment: $env_name"
+        if [ "$plan_all" = false ] || [ "$env_count" -lt 2 ] ; then
+            note_summary="$note_summary $nl_sep 1) DEPLOY PLAN for environment: $env"
+            process_plan_comments
+            break
+        else
+            let index+=1
+            plan_comments="$plan_comments$env_separator $nl_sep $env_detail $nl_sep $plan_comment $nl_sep  $nl_sep "
+            note_summary="$note_summary $nl_sep $index) DEPLOY PLAN for environment: $env_name"
+        fi
     done < deploy_environments
+
+if [ "$plan_all" = false ] || [ "$env_count" -lt 2 ] ; then
+    process_plan_comments
+else
     post_pr_comment "$prefix $nl_sep $multi_env_label $nl_sep $plan_all_note $nl_sep $note_summary $nl_sep  $nl_sep $plan_comments $nl_sep  $nl_sep $more_details"
 fi
 }
+
+
 #main starts here
 # after script runs in seperate context, so load variables from before and script sections
 if [ "$stage" = "post_build" ]; then
@@ -1039,36 +1006,61 @@ if [ "$stage" = "build" ]; then
     if [[ -z "${deployment_decriptor}" ]]; then
         deployment_decriptor="deployment.yaml"
     fi
-    # parse deployment Descriptor
-    python stack_parser.py $CI_PROJECT_DIR/$deployment_decriptor | tee parse_log
-    env_count=`wc -l < deploy_environments`
 
-    # configure aws environment
-    configure_aws_environment
-
-    # get stack status and validate deployment descriptor
-    stack_status_report
-    validate_deployment_descriptor 
-
-    previous_env_detail=$env_detail
-    previous_env_separator="============================ENVIRONMENT:$env============================"
-    env_detail="Environment name: $env_name | Account-Id: $account_id"
     get_pr_details
+    # parse deployment Descriptor
+    python stack_parser.py $WORKSPACE/$deployment_decriptor | tee parse_log
+    env_count=`wc -l < deploy_environments`
+    # get_pr_details
 
-    if [ "$pr_status" == "MERGED" ]; then
-        cfci_deploy
-        
-        # Switch to caller account
-        configure_aws_environment "caller"
+    if [ "$pr_status" == "DEPLOY" ]; then
+        env_deploy_executed=false
+        prev_env="none"
+        env_name="none"
+        while read -r environment
+        do
+            if [ "$env_name" != "none" ]; then
+                prev_env=$env_name
+            fi
+            env_name=$(jq -r '.name' <<< "$environment")
+            account_id=$(jq -r '.account_id' <<< "$environment")
+            if [ "$env_deploy_executed" = true ]; then
+                next_env=true
+                configure_aws_environment
+                break  # find next env to run plan and then exit
+            fi
+            if [ "$deploy_environment" == "$env_name" ]; then # find the env deploy requested for.
+                #code to check if deploy requested for prev environment, if no dont run build.
+                if [ "$prev_env" != "none" ]; then
+                    switch_set_e
+                    curl -s -X GET --header "PRIVATE-TOKEN: $GITLAB_SVC_ACCNT_TOKEN" $api_url/notes > comments
+                    switch_set_e
+                     if grep "cf deploy $prev_env" comments ; then
+                     configure_aws_environment
+                        # get stack status and validate deployment descriptor
+                        stack_status_report
+                        validate_deployment_descriptor
+                        cfci_deploy
+                        env_deploy_executed=true
+                    else
+                        echo "WARNING:DEPLOY Operation is requested for environment:$env_name" > output
+                        echo "But deploy operation was not requested for environment:$prev_env in the pipeline." >> output
+                        exit_and_set_build_status
+                    fi
+                else
+                    configure_aws_environment
+                    # get stack status and validate deployment descriptor
+                    stack_status_report
+                    validate_deployment_descriptor
+                    cfci_deploy
+                    env_deploy_executed=true
+                fi
+            fi
+        done < deploy_environments
 
-        # configure aws environment for next environment defined in deploy_environments
-        configure_aws_environment
         if [ "$next_env" = true ]; then
             echo "" >> stack_log
             echo "" >> stack_log
-            
-            # echo $env_separator >> stack_log
-            # echo "" >> stack_log
             stack_status_report
             validate_deployment_descriptor
             cfci_plan
@@ -1082,14 +1074,14 @@ if [ "$stage" = "build" ]; then
         fi
     elif [ "$pr_status" == "OPEN" ]; then    
         process_plan
-
     else
         echo "Action not defined"
     fi
 elif [ "$stage" = "post_build" ] && [ "$CODEBUILD_BUILD_SUCCEEDING" = "false" ] ; then
     printenv
+    export $CODEBUILD_BUILD_SUCCEEDING
     format_change_output output
     cat output
+    get_pr_details
     post_pr_comment "$prefix$build_failed$stack_changes$more_details"
-    exit 1
 fi
