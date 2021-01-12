@@ -239,7 +239,9 @@ validate_deployment_descriptor() {
                 if [ "$env_status" -eq 0 ]  || [ "$all_status" -eq 0 ]; then
                     # check if dependent stacks are listed for a stack
                     cd ..
+                    current_stack="${stack_name_with_ext}"
                     python graph.py $project $env "$env/${stack_name_with_ext%.*}"
+                    cat stack_graph
                     cp stack_graph $project
                     cd $project
                     while read -r dep_stack
@@ -255,7 +257,7 @@ validate_deployment_descriptor() {
                                     echo "" >> descriptor_errors
                                     echo "**$block:$deploy_stack**" >> descriptor_errors
                                 fi
-                            echo "ERROR:Stack $stack_name_with_ext has a dependent stack: $dep_stack, which is not listed in deployment descriptor." >> descriptor_errors
+                            echo "ERROR:Stack $current_stack has a dependent stack: $dep_stack, which is not listed in deployment descriptor." >> descriptor_errors
                             fi
                         else
                             # check if dependent stacks is listed after the stack
@@ -269,12 +271,13 @@ validate_deployment_descriptor() {
                                 echo "" >> descriptor_errors
                                 echo "**$block:$deploy_stack**" >> descriptor_errors
                                 fi
-                            echo "ERROR:Stack $stack_name_with_ext has a dependent stack: $dep_stack, which is listed after $stack_name_with_ext in the deployment descriptor." >> descriptor_errors
+                            echo "ERROR:Stack $current_stack has a dependent stack: $dep_stack, which is listed after $stack_name_with_ext in the deployment descriptor." >> descriptor_errors
                             # echo "" >> descriptor_errors
                             fi
                         fi
                     done < stack_graph
 
+                    stack_name_with_ext=$current_stack
                     # check and download gold template
                     if [ "$gold" = true ] && [ "$template_version" != null ] && [ "$no_ext_stack" = false ] ; then
                             download_artifactory_template $stack_name_with_ext
