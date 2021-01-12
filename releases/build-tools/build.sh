@@ -244,6 +244,7 @@ validate_deployment_descriptor() {
                     cd ..
                     current_stack="${stack_name_with_ext}"
                     python graph.py $project $env "$env/${stack_name_with_ext%.*}"
+                    cat stack_graph
                     cp stack_graph $project
                     cd $project
                     while read -r dep_stack
