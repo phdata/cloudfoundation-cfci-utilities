@@ -242,12 +242,12 @@ validate_deployment_descriptor() {
                 if [ "$env_status" -eq 0 ]  || [ "$all_status" -eq 0 ]; then
                     # check if dependent stacks are listed for a stack
                     cd ..
-                    python graph.py $project $env "$env/${stack_name_with_ext%.*}"
+                    current_stack="$env/${stack_name_with_ext%.*}"
+                    python graph.py $project $env $current_stack
                     cp stack_graph $project
                     cd $project
                     while read -r dep_stack
                     do
-                        current_stack="$env/${stack_name_with_ext%.*}"
                         if ! grep -q ":$dep_stack" deploy_tmp ; then
                             no_changeset=true
                             get_stack_action $env/${dep_stack%.*} $block
@@ -831,7 +831,7 @@ stack_status_report() {
         echo $dependency_label > output
         cat stack_status_report >> output
         exit 1 
-    elif grep "Traceback " stack_status_report ; then
+    elif grep "Traceback " stack_status_report ; thena
         echo $syntax_err_label > output
         echo "" >> output
         cat stack_status_report >> output
