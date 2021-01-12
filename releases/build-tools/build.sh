@@ -278,6 +278,7 @@ validate_deployment_descriptor() {
                         fi
                     done < stack_graph
 
+                    stack_name_with_ext=$current_stack
                     # check and download gold template
                     if [ "$gold" = true ] && [ "$template_version" != null ] && [ "$no_ext_stack" = false ] ; then
                             download_artifactory_template $stack_name_with_ext
