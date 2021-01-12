@@ -247,7 +247,7 @@ validate_deployment_descriptor() {
                     cd $project
                     while read -r dep_stack
                     do
-                    
+                        current_stack="$env/${stack_name_with_ext%.*}"
                         if ! grep -q ":$dep_stack" deploy_tmp ; then
                             no_changeset=true
                             get_stack_action $env/${dep_stack%.*} $block
@@ -258,7 +258,7 @@ validate_deployment_descriptor() {
                                     echo "" >> descriptor_errors
                                     echo "**$block:$deploy_stack**" >> descriptor_errors
                                 fi
-                            echo "ERROR:Stack $stack_name_with_ext has a dependent stack: $dep_stack, which is not listed in deployment descriptor." >> descriptor_errors
+                            echo "ERROR:Stack $current_stack has a dependent stack: $dep_stack, which is not listed in deployment descriptor." >> descriptor_errors
                             fi
                         else
                             # check if dependent stacks is listed after the stack
@@ -272,7 +272,7 @@ validate_deployment_descriptor() {
                                 echo "" >> descriptor_errors
                                 echo "**$block:$deploy_stack**" >> descriptor_errors
                                 fi
-                            echo "ERROR:Stack $stack_name_with_ext has a dependent stack: $dep_stack, which is listed after $stack_name_with_ext in the deployment descriptor." >> descriptor_errors
+                            echo "ERROR:Stack $current_stack has a dependent stack: $dep_stack, which is listed after $stack_name_with_ext in the deployment descriptor." >> descriptor_errors
                             # echo "" >> descriptor_errors
                             fi
                         fi
@@ -337,7 +337,7 @@ check_template_exist() {
 download_artifactory_template() {
     template_exist=""
     #template path from stack file
-    template_path_string=`grep "template_path" config/$env/$1 | head -1`
+    template_path_string=`grep "template_path" config/$1 | head -1`
     #template_path value from stack file
     template_path=`echo $template_path_string | cut -d':' -f2-`
     # remove line comment at the end and trim template path
