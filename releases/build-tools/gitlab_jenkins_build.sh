@@ -921,9 +921,10 @@ configure_aws_environment() {
 
    #caller_account=`aws sts get-caller-identity | jq -r .Account`
    #assume role for requested env
-   AWS_SESSION_TOKEN=""
-   aws sts assume-role --role-arn arn:aws:iam::$account_id:role/cloudfoundation-admin --role-session-name cloufoundationAdmin > sts_caller.json
-   export_aws_var sts_caller.json
+   #Assume role is not required as Jenkins have an inbuilt feature
+    # AWS_SESSION_TOKEN=""
+    # aws sts assume-role --role-arn arn:aws:iam::$account_id:role/cloudfoundation-admin --role-session-name cloufoundationAdmin > sts_caller.json
+    # export_aws_var sts_caller.json
    
    if [ -z "$env" ];then
     env=$env_name
@@ -938,14 +939,14 @@ configure_aws_environment() {
    env_separator="============================ENVIRONMENT:$env_name============================"
 }
 
-export_aws_var () {
-    sts_file=$1
-    set +x
-    export AWS_ACCESS_KEY_ID=`jq -r .Credentials.AccessKeyId $sts_file`
-    export AWS_SECRET_ACCESS_KEY=`jq -r .Credentials.SecretAccessKey $sts_file`
-    export AWS_SESSION_TOKEN=`jq -r .Credentials.SessionToken $sts_file`
-    set -x
-}
+# export_aws_var () {
+#     sts_file=$1
+#     set +x
+#     export AWS_ACCESS_KEY_ID=`jq -r .Credentials.AccessKeyId $sts_file`
+#     export AWS_SECRET_ACCESS_KEY=`jq -r .Credentials.SecretAccessKey $sts_file`
+#     export AWS_SESSION_TOKEN=`jq -r .Credentials.SessionToken $sts_file`
+#     set -x
+# }
 
 process_plan_comments () {
     if [ "$env_count" -gt 1 ]; then
