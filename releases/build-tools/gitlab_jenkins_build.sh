@@ -916,8 +916,10 @@ configure_aws_environment() {
    #export cred for requested env
    eval key_name=\$AWS_ACCESS_KEY_ID_$env_name 
    eval secret_name=\$AWS_SECRET_ACCESS_KEY_$env_name 
+   eval session_token=\$AWS_SESSION_TOKEN_$env_name 
    export AWS_ACCESS_KEY_ID=$key_name
    export AWS_SECRET_ACCESS_KEY=$secret_name
+   export AWS_SESSION_TOKEN=$session_token
 
    #caller_account=`aws sts get-caller-identity | jq -r .Account`
    #assume role for requested env
