@@ -1019,6 +1019,15 @@ if [ "$stage" = "build" ]; then
     # get_pr_details
 
     if [ "$pr_status" == "DEPLOY" ]; then
+        commented_user=`curl -s -X GET --header "PRIVATE-TOKEN: $GITLAB_SVC_ACCNT_TOKEN" $api_url/notes | jq -r '.[0].author.username'`
+        if [[ "$cloudfoundation_approved_users" == *"$commented_user"* ]]; then
+            echo "DEPLOY Operation requested by approved user: $commented_user"
+        else
+            echo "Authorization Error:DEPLOY Operation is requested by user $commented_user" > output
+            echo "This user is not part of cloudfoundation_approved_users secret in Jenkins credentials" >> output
+            exit_and_set_build_status
+        fi
+
         env_deploy_executed=false
         prev_env="none"
         env_name="none"
@@ -1041,19 +1050,12 @@ if [ "$stage" = "build" ]; then
                     curl -s -X GET --header "PRIVATE-TOKEN: $GITLAB_SVC_ACCNT_TOKEN" $api_url/notes > comments
                     switch_set_e
                      if grep "cf deploy $prev_env" comments ; then
-                        commented_user=`curl -s -X GET --header "PRIVATE-TOKEN: $GITLAB_SVC_ACCNT_TOKEN" $api_url/notes | jq -r '.[0].author.username'`
-                        if [[ "$cloudfoundation_approved_users" == *"$commented_user"* ]]; then
-                            configure_aws_environment
-                            # get stack status and validate deployment descriptor
-                            stack_status_report
-                            validate_deployment_descriptor
-                            cfci_deploy
-                            env_deploy_executed=true
-                        else
-                            echo "Authorization Error:DEPLOY Operation is requested by user $commented_user" > output
-                            echo "This user is not part of cloudfoundation_approved_users secret in Jenkins credentials" >> output
-                            exit_and_set_build_status
-                        fi
+                        configure_aws_environment
+                        # get stack status and validate deployment descriptor
+                        stack_status_report
+                        validate_deployment_descriptor
+                        cfci_deploy
+                        env_deploy_executed=true
                     else
                         echo "WARNING:DEPLOY Operation is requested for environment:$env_name" > output
                         echo "But deploy operation was not requested for environment:$prev_env in the pipeline." >> output
