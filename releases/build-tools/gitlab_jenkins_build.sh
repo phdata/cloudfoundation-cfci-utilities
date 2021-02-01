@@ -1,4 +1,3 @@
-
 #!/bin/bash -x
 
 #  Copyright 2018 phData Inc.
@@ -875,7 +874,7 @@ fi
 
 exit_and_set_build_status() {
     # export CODEBUILD_BUILD_SUCCEEDING=false
-    echo "CODEBUILD_BUILD_SUCCEEDING=false" >> variables_file
+    echo "CODEBUILD_BUILD_SUCCEEDING=false" >> $WORKSPACE/variables_file
     exit 1
 }
 
@@ -991,9 +990,10 @@ fi
 
 
 #main starts here
+
 # after script runs in seperate context, so load variables from before and script sections
 if [ "$stage" = "post_build" ]; then
-    source variables_file
+    source $WORKSPACE/variables_file
 fi
 
 if [[ -z "${quickstart}" ]]; then
@@ -1005,7 +1005,7 @@ if [ "$quickstart" = true ]; then
 fi
 
 if [ "$stage" = "build" ]; then
-    echo "CODEBUILD_BUILD_SUCCEEDING=true" >> variables_file
+    echo "CODEBUILD_BUILD_SUCCEEDING=true" >> $WORKSPACE/variables_file
     #check for deployment descriptor file OR set default file name
     if [[ -z "${deployment_decriptor}" ]]; then
         deployment_decriptor="deployment.yaml"
