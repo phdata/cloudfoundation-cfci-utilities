@@ -990,6 +990,7 @@ fi
 
 
 #main starts here
+touch $WORKSPACE/variables_file
 
 # after script runs in seperate context, so load variables from before and script sections
 if [ "$stage" = "post_build" ]; then
