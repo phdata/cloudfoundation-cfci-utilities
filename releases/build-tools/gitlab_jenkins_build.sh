@@ -1024,7 +1024,7 @@ if [ "$stage" = "build" ]; then
             echo "DEPLOY Operation requested by approved user: $commented_user"
         else
             echo "Authorization Error:DEPLOY Operation is requested by user $commented_user" > output
-            echo "This user is not part of cloudfoundation_approved_users secret in Jenkins credentials" >> output
+            echo "This user is not part of cloudfoundation_approved_users secret in Jenkins" >> output
             exit_and_set_build_status
         fi
 
