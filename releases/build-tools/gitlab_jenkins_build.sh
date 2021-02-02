@@ -879,8 +879,12 @@ exit_and_set_build_status() {
 }
 
 get_pr_details() {
-            
-        api_url="https://gitlab.com/api/v4/projects/$gitlabMergeRequestTargetProjectId/merge_requests/$gitlabMergeRequestIid"
+        
+        if [[ ! -z "$gitlab_api_url" ]]; then
+            api_url="$gitlab_api_url/api/v4/projects/$gitlabMergeRequestTargetProjectId/merge_requests/$gitlabMergeRequestIid"
+        else
+            api_url="https://gitlab.com/api/v4/projects/$gitlabMergeRequestTargetProjectId/merge_requests/$gitlabMergeRequestIid"
+        fi
         # mr_status=`curl -s -X GET --header "PRIVATE-TOKEN: $GITLAB_SVC_ACCNT_TOKEN" $api_url/resource_state_events | jq -r '.[].state'`
         # if [ "$pr_status" == "MERGED" ] && [ "$mr_status" != "merged" ]; then 
         # echo "WARNING:DEPLOY Operation requested but merge-request is not merged into master yet" > output
