@@ -242,6 +242,7 @@ validate_deployment_descriptor() {
                     cd ..
                     current_stack="${stack_name_with_ext}"
                     python graph.py $project $env "$env/${stack_name_with_ext%.*}"
+                    echo "stack_graph:"
                     cat stack_graph
                     cp stack_graph $project
                     cd $project
@@ -399,7 +400,7 @@ function cfci_plan (){
             echo "$deploy_stack"
             stack_name_with_ext=$(jq -r '.name' <<< "$deploy_stack")
             stack="${stack_name_with_ext%.*}" #remove extenstion - for stack
-            
+            echo "Processing stack: $stack_name_with_ext"
             #check if deploy_env contains current env OR all
             check_if_deploy_requested
 
@@ -410,7 +411,7 @@ function cfci_plan (){
             else
                 stack_action="env_IGN"
             fi
-
+            echo "stack_action: $stack_action"
             case $stack_action in
             A)
                 echo "$sep_line_single STACK:$stack_name_with_ext $sep_line_single" >> A_output
@@ -554,7 +555,7 @@ function cfci_deploy (){
         stack_name_with_ext=$(jq -r '.name' <<< "$deploy_stack")
         # stack=`echo $deploy_stack | awk -F ".yaml-" '{ print $1 }'`
         stack="${stack_name_with_ext%.*}" #remove extenstion - needed when template version is not specified in the descriptor
-
+        echo "Processing stack: $stack_name_with_ext"
         # check if current environment exist in deploy_env
         switch_set_e
         env_result=$(jq -r --exit-status --arg env "$env" 'select(.deploy_env | index($env))' <<< "$deploy_stack")
@@ -572,7 +573,7 @@ function cfci_deploy (){
         else
             stack_action="env_IGN"  
         fi
-
+        echo "stack_action: $stack_action"
         case $stack_action in
             A)
                 echo "$sep_line_single CREATE_STACK for $stack_name_with_ext $sep_line_single" >> stack_log
@@ -676,7 +677,7 @@ write_comments_file () {
 }
 
 get_stack_action () {
-    echo "cwd is"`pwd`
+    # echo "cwd is"`pwd`
     stack_status=$(jq --arg stack "$1" -c '.[$stack]' stack_status_report)
     traceback=false
     stack_name_rem_slash=`sed -e 's#.*/\(\)#\1#' <<< "$1"`
@@ -842,6 +843,7 @@ stack_status_report() {
         exit_and_set_build_status
     fi
     sed -i.bak '/Request limit exceeded/d' stack_status_report && rm -f stack_status_report.bak
+    echo "Refer stack_status_report below:"
     cat stack_status_report
 }
 
