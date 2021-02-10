@@ -1105,4 +1105,5 @@ elif [ "$stage" = "post_build" ] && [ "$CODEBUILD_BUILD_SUCCEEDING" = "false" ] 
     cat output
     get_pr_details
     post_pr_comment "$prefix$build_failed$stack_changes$more_details"
+    exit_and_set_build_status
 fi
