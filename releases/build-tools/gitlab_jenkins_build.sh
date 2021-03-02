@@ -17,6 +17,9 @@
 
 #shell options 
 set -e
+if [ "${trace-}" = "true" ]; then 
+  set -x
+fi
 
 # variables/ labels
 delete_this="TEST"
