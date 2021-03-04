@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash 
 
 #  Copyright 2018 phData Inc.
 # 
@@ -17,6 +17,9 @@
 
 #shell options 
 set -e
+if [ "${trace-}" = "true" ]; then 
+  set -x
+fi
 
 # variables/ labels
 prefix="phData-CFCI build:"
