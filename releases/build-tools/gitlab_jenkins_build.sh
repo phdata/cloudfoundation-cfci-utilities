@@ -736,9 +736,9 @@ changeset_action() {
     do
         switch_set_e
         if [ "$1" = "describe" ]; then
-            sceptre --no-colour --ignore-dependencies describe change-set -v $2 $3 &> output
+            sceptre --no-colour --output json --ignore-dependencies describe change-set -v $2 $3 &> output
         elif [ "$1" = "delete" ]; then
-            sceptre --no-colour describe change-set $2 $3 &> output
+            sceptre --no-colour --output json describe change-set $2 $3 &> output
         fi
         switch_set_e
         if grep "Traceback " output ; then
