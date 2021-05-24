@@ -200,7 +200,9 @@ validate_deployment_descriptor() {
             gold=$(jq -r '.phdata_gold_template' <<< "$deploy_stack")
             gold=`echo "$gold" | tr '[:upper:]' '[:lower:]'`  #switch to lower case
             template_version=$(jq -r '.version' <<< "$deploy_stack")
-  
+            depends_file=$(jq -r '.depends' <<< "$deploy_stack")
+            SAM_build=$(jq -r '.SAM_build' <<< "$deploy_stack")
+
             if [ "$stack_name_with_ext" = null ] || [ "$gold" = null ] ; then
                 continue
             fi
@@ -293,8 +295,62 @@ validate_deployment_descriptor() {
                                 download=false
                             fi
                     fi
-                fi
 
+                    # check and download depends file
+                    if [ "$depends_file" != null ]; then
+                        depends_artfct_uri=$artifactory_base_url$depends_file
+                        if check_template_exist $depends_artfct_uri; then
+                            if [[ "$CODEBUILD_INITIATOR" == "codepipeline/"* ]]; then
+                                # depends_dir=$(echo $depends_file | sed 's|^[^/]*\(/[^/]*/\).*$|\1|')  # get string between two slashes
+                                depends_dir=`basename $(dirname "${depends_file}")`  # relative path of zipfile
+                                depends_file_name=${depends_file##*/}
+                                lambda_src_bucket=$(yq -r  .template_bucket_name config/$env/config.yaml)
+                                switch_set_e
+                                aws s3api head-object --bucket $lambda_src_bucket --key $depends_file
+                                if [[ $? -ne 0 ]]; then
+                                    mkdir -p $depends_dir
+                                    cd $depends_dir && { curl -u$artifactory_usr:$artifactory_pwd -O $depends_artfct_uri ; cd -; }
+                                    aws s3 cp $depends_dir/$depends_file_name s3://$lambda_src_bucket/$depends_file
+                                    if [ $? = 0 ]; then
+                                        echo "s3://$lambda_src_bucket/$depends_file  upload is successful"
+                                    else
+                                        echo "ERROR while uploading dependency file: $depends_file to bucket:$lambda_src_bucket" >> descriptor_errors
+                                    fi
+                                else
+                                    echo "WARN: Requested depends file:$depends_file already exist in the bucket $lambda_src_bucket"
+                                fi
+                                switch_set_e
+                            fi
+                        else
+                            echo "ERROR:Requested dependency file: $depends_file doesnt exist in phData repository." >> descriptor_errors
+                        fi
+                    fi
+
+                    # process sam package
+                    if [[ "$SAM_build" != null && "$SAM_build" = true ]]; then
+                        sam_template_filepath=$(yq -r  .template_path config/$env/$stack_name_with_ext)
+                        sam_template_name=`basename $sam_template_filepath`
+                        sam_app_path=$(dirname "${sam_template_filepath}")
+                        lambda_src_bucket=$(yq -r  .template_bucket_name config/$env/config.yaml)
+                        appname=`basename $sam_app_path`
+                        cd templates/$sam_app_path
+                        # FIX Me: uploads the lambda source to cloudfoundation bucket during the PLAN. 
+                        # Find a way to get the zip file name before upload OR delete the file after PLAN is generated and DEPLOY is completed through sceptre commands.
+                        switch_set_e
+                        sam package --s3-bucket $lambda_src_bucket --s3-prefix "lambda/$appname" --output-template-file "generated_$sam_template_name.yaml" &> pack_output
+                        switch_set_e
+                        if grep -q "Error" pack_output ; then
+                            echo "ERROR:: While building SAM package, refer to the below log" >> descriptor_errors
+                            cat pack_output >>  $CODEBUILD_SRC_DIR/final_output
+                            exit 1
+                        else
+                            mv $sam_template_name "original-$sam_template_name"
+                            mv "generated_$sam_template_name.yaml" $sam_template_name
+                            cd -
+                        fi
+                    fi
+
+                fi
             fi
 
         done < $block
@@ -620,6 +676,7 @@ function cfci_deploy (){
                 elif [ "$status" == "nochangeset" ]; then
                     echo "Error occurred while creating the changeset, Review the log below:" >> stack_log
                     cat cs_output >> stack_log
+                    cat output >> stack_log
                 else 
                     switch_set_e
                     sceptre --no-colour --ignore-dependencies execute -y "$stack_name_with_ext" "$changeset_name" &> output
@@ -676,8 +733,6 @@ function cfci_deploy (){
     else
         deploy_comment="No changes,Infrastructure is up-to-date. No action was performed by CFCI BUILD."
     fi
-
-
 }
 
 write_comments_file () {
@@ -734,7 +789,6 @@ get_stack_action () {
         echo "NO action"
         ;;
     esac
-
 }
 
 changeset_action() {
@@ -757,10 +811,12 @@ changeset_action() {
         else 
             status=$(jq -r ".Status" output)
         fi
+        echo "status is::$status"
         case $status in
         *"CREATE_IN_PROGRESS"*)
             sleep 3
             let i+=3
+            echo "CREATE_IN_PROGRESS"
             if [ $i -ge 300 ];then break 
             fi
             ;;
