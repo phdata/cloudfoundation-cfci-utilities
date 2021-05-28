@@ -2,9 +2,12 @@
 phData cloudfoundation cfci(CloudFoundation Continuous Integration) build scripts, Refer to our documentation at https://docs.customer.phdata.io/docs/cloudfoundation/ to know more about this tool
 
 # Release Notes
-## 1.2.3
+## 1.2.4
 ### Changes
 * Changes to support continuous deployments for lambda functions.
+* Fix aws SAM build command issue
+* Fixing issue with bash shell options.
+
 ### Upgrade Notes
 * Add yq to requirments.txt in cloudfoundation repository
 
