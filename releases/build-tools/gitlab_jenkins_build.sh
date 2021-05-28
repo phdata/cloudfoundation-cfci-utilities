@@ -336,6 +336,11 @@ validate_deployment_descriptor() {
                         # FIX Me: uploads the lambda source to cloudfoundation bucket during the PLAN. 
                         # Find a way to get the zip file name before upload OR delete the file after PLAN is generated and DEPLOY is completed through sceptre commands.
                         switch_set_e
+                        sam build &> build_output 
+                        if grep -q "Build Failed" build_output ; then
+                            echo "ERROR while executing the build for application $application_directory" >> descriptor_errors
+                            cat build_output  >> descriptor_errors
+                        fi
                         sam package --s3-bucket $lambda_src_bucket --s3-prefix "lambda/$appname" --output-template-file "generated_$sam_template_name.yaml" &> pack_output
                         switch_set_e
                         if grep -q "Error" pack_output ; then
@@ -837,7 +842,9 @@ changeset_action() {
 format_change_output () {
     # if [ "$repo_type" = "bitbucket" ]; then
         stack_changes=""
-        set +x
+        if [ "${trace-}" = "true" ]; then 
+            set +x
+        fi
         while read -r LINE
         do
         #temp fix to escape special char's handle it in a  better way later
@@ -849,7 +856,9 @@ format_change_output () {
             stack_changes="${stack_changes} $nl_sep ${LINE}"
         fi
         done < $1
-        set -x
+        if [ "${trace-}" = "true" ]; then 
+            set -x
+        fi
         echo $stack_changes
     # fi
 }
