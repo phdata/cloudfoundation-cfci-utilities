@@ -842,7 +842,9 @@ changeset_action() {
 format_change_output () {
     # if [ "$repo_type" = "bitbucket" ]; then
         stack_changes=""
-        set +x
+        if [ "${trace-}" = "true" ]; then 
+            set +x
+        fi
         while read -r LINE
         do
         #temp fix to escape special char's handle it in a  better way later
@@ -854,7 +856,9 @@ format_change_output () {
             stack_changes="${stack_changes} $nl_sep ${LINE}"
         fi
         done < $1
-        set -x
+        if [ "${trace-}" = "true" ]; then 
+            set -x
+        fi
         echo $stack_changes
     # fi
 }
