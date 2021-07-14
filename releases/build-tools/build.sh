@@ -567,12 +567,14 @@ function cfci_plan (){
     fi
 
     if [ -s A_output ]; then
-        format_change_output A_output
+        # format_change_output A_output
+        pretty_printing newstack A_output
         plan_comment="$plan_comment $nl_sep  $nl_sep $sep_line STACKS - DEPLOY REQUESTED $sep_line $nl_sep $stack_changes"
     fi
 
     if [ -s M_output ]; then
-        format_change_output M_output
+        # format_change_output M_output
+        pretty_printing changeset M_output
         plan_comment="$plan_comment $nl_sep $nl_sep $sep_line CHANGESET FOR MODIFIED STACKS $sep_line $nl_sep $stack_changes"
     fi
 
@@ -1129,6 +1131,86 @@ elif [ "$plan_all" = true ]; then
 fi
 }
 
+#This method will start pretty printing for changeset created for existing and when newstack is created
+start_pertty_printing() {
+        input_file=$2   
+        rm pp_output
+        rm resources_file
+        touch pp_output
+        touch resources_file
+
+        stack_info_line="------------***Stack Details***------------"
+        parameters_info_line="------------***Parameters***------------"
+        resources_info_line="------------***Resource Details***------------"
+
+        if [[ $1 == "changeset" ]]; then
+                stackname=$(jq -r '.StackName' $input_file)
+                echo "" >>pp_output
+                echo "=========== ***Stackname : $(jq -r '.StackName' $input_file)*** ============" >>pp_output
+                echo "" >>pp_output
+                echo "$stack_info_line" >>pp_output
+                echo "" >>pp_output
+                echo "ExecutionStatus : $(jq -r '.ExecutionStatus' $input_file $nl_sep)" >>pp_output
+                echo "ChangesetStatus : $(jq -r '.Status ' $input_file)" >>pp_output
+                echo "" >>pp_output
+                echo "$parameters_info_line" >>pp_output
+                echo "" >>pp_output
+                echo "$(jq -r '.Parameters[] | keys[] as $k | "\($k) : \(.[$k])"' $input_file) \n" >>pp_output
+                echo "" >>pp_output
+                echo "$resources_info_line" >>pp_output
+                echo "$(jq -r '.Changes[].ResourceChange|"\n**ResourceType** = "+.ResourceType,"Action : "+.Action,"LogicalResourceID : "+.LogicalResourceId,[.Details[]|"Target Name : "+.Target.Name,"RequiresRecreation : "+.Target.RequiresRecreation,"ChangeSource : "+.ChangeSource,"CausingEntity : "+.CausingEntity]' $input_file)" >>resources_file
+                sed '/\[\]/d' resources_file >>pp_output
+                format_change_output pp_output
+
+        elif [[ $1 == "newstack" ]]; then
+                echo "newstack operations"
+                rm params_file
+                touch params_file
+                echo "" >>pp_output
+                echo "$stack_info_line" >>pp_output
+                echo "" >>pp_output
+                echo "AWSTemplateFormatVersion :  $(jq -r '.[].AWSTemplateFormatVersion' $input_file)" >>pp_output
+                echo "Description :  $(jq -r '.[].Description' $input_file)" >>pp_output
+                echo "" >>pp_output
+                echo "$parameters_info_line" >>pp_output
+                echo "$(jq -r '.[].Parameters | keys[] as $k | "Key : \($k)  \nType : \(.[$k].Type)\nDescription : \(.[$k].Description)\nDefault : \(.[$k].Default)\nAllowedPattern : \(.[$k].AllowedPattern)\nAllowedValues : \(.[$k].AllowedValues)\n"' $input_file)" >>params_file
+                sed '/null/d' params_file >> pp_output
+                echo "" >>pp_output
+                echo "$resources_info_line" >>pp_output
+                echo "$(jq -r '.[].Resources[] | "\n**Resource Type** ::: "+.Type+"\n**Resource Attributes**",(.Properties | keys_unsorted[] as $k | "   \($k) : \(.[$k])")' $input_file)" >>resources_file
+                cat resources_file | tr -d \\ >>pp_output
+
+                output_params=$(jq '.[].Outputs | keys[] as $k | "\($k)"' $input_file)
+                if [[ $output_params ]]; then
+                        echo "---------------***Output Parameters Exported From Stack***----------------" >>pp_output
+                        echo $output_params >>pp_output
+                else
+                        echo "\n\n" >>pp_output
+                        echo "***Stack does not export any output parameters***" >>pp_output
+                fi
+                format_change_output pp_output
+        fi
+
+}
+
+# this method format input jason file and invoke pretty printing process
+pretty_printing() {
+        if jq empty $2; then
+                echo "Valid json received"
+                start_pertty_printing $1 $2
+        else
+                echo "formatting file as invalid json received"
+                formatted_text=""
+                rm formatted_file
+                touch formatted_file
+                while IFS= read -r LINE || [[ -n "$LINE" ]]; do
+                        formatted_text="${formatted_text} $nl_sep ${LINE//\\/\\\\\\}"
+                done < "$2"
+                echo "file formatted"
+                echo $formatted_text >>formatted_file
+                start_pertty_printing $1 formatted_file
+        fi
+}
 
 #main starts here
 
