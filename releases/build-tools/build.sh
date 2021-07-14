@@ -477,7 +477,11 @@ function cfci_plan (){
             fi
 
             case $stack_action in
-            A)
+            A)  
+                rm ns_pp_output
+                rm ns_resources_file
+                touch ns_pp_output
+                touch ns_resources_file
                 echo "$sep_line_single STACK:$stack_name_with_ext $sep_line_single" >> A_output
                 if [[ $stack_status == "\"ROLLBACK_COMPLETE\"" ]]; then
                     echo $rc_label >> A_output
@@ -498,9 +502,15 @@ function cfci_plan (){
                 #   AllowedPattern="(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})",
                 #     switch_set_e
                 fi
-                cat output >> A_output
+                pretty_printing newstack output
+                cat ns_pp_output >> A_output
                 ;;
             M)
+                # M=Modified stack
+                rm cs_pp_output
+                rm cs_resources_file
+                touch cs_pp_output
+                touch cs_resources_file
                 echo "$sep_line_single STACK:$stack_name_with_ext $sep_line_single" >> M_output
                 if [ "$traceback" = true ];then
                     echo "Error while creating changeset for $stack_name_with_ext, Refer to the message below:" >> M_output
@@ -513,7 +523,10 @@ function cfci_plan (){
                     cat cs_output >> M_output
                 else
                     # cat output >> M_output
-                    jq 'del(.ResponseMetadata,.CreationTime,.StackId,.ChangeSetId,.ChangeSetName)' output >> M_output
+                    # commenting this line as it is not required
+                    # jq 'del(.ResponseMetadata,.CreationTime,.StackId,.ChangeSetId,.ChangeSetName)' output >> M_output
+                    pretty_printing changeset output
+                    cat cs_pp_output >> M_output
                     changeset_action "delete" "$stack_name_with_ext" "$changeset_name" #delete change-set
                 fi
                 
@@ -1129,6 +1142,86 @@ elif [ "$plan_all" = true ]; then
 fi
 }
 
+#This method will start pretty printing for changeset created for existing and when newstack is created
+start_pertty_printing() {
+        input_file=$2   
+
+        stack_info_line="------------***Stack Details***------------"
+        parameters_info_line="------------***Parameters***------------"
+        resources_info_line="------------***Resource Details***------------"
+
+        if [[ $1 == "changeset" ]]; then
+                stackname=$(jq -r '.StackName' $input_file)
+                echo "" >>cs_pp_output
+                echo "=========== ***Stackname : $(jq -r '.StackName' $input_file)*** ============" >>cs_pp_output
+                echo "" >>cs_pp_output
+                echo "$stack_info_line" >>cs_pp_output
+                echo "" >>cs_pp_output
+                echo "ExecutionStatus : $(jq -r '.ExecutionStatus' $input_file $nl_sep)" >>cs_pp_output
+                echo "ChangesetStatus : $(jq -r '.Status ' $input_file)" >>cs_pp_output
+                echo "" >>cs_pp_output
+                echo "$parameters_info_line" >>cs_pp_output
+                echo "" >>cs_pp_output
+                echo "$(jq -r '.Parameters[] | keys[] as $k | "\($k) : \(.[$k])"' $input_file) \n" >>cs_pp_output
+                echo "" >>cs_pp_output
+                echo "$resources_info_line" >>cs_pp_output
+                echo "$(jq -r '.Changes[].ResourceChange|"\n**ResourceType** = "+.ResourceType,"Action : "+.Action,"LogicalResourceID : "+.LogicalResourceId,[.Details[]|"Target Name : "+.Target.Name,"RequiresRecreation : "+.Target.RequiresRecreation,"ChangeSource : "+.ChangeSource,"CausingEntity : "+.CausingEntity]' $input_file)" >>cs_resources_file
+                sed '/\[\]/d' cs_resources_file >>cs_pp_output
+                echo "" >>cs_pp_output
+                echo "" >>cs_pp_output
+                # format_change_output pp_output
+
+        elif [[ $1 == "newstack" ]]; then
+                echo "newstack operations"
+                rm params_file
+                touch params_file
+                echo "" >>ns_pp_output
+                echo "$stack_info_line" >>ns_pp_output
+                echo "" >>ns_pp_output
+                echo "AWSTemplateFormatVersion :  $(jq -r '.[].AWSTemplateFormatVersion' $input_file)" >>ns_pp_output
+                echo "Description :  $(jq -r '.[].Description' $input_file)" >>ns_pp_output
+                echo "" >>ns_pp_output
+                echo "$parameters_info_line" >>ns_pp_output
+                echo "$(jq -r '.[].Parameters | keys[] as $k | "Key : \($k)  \nType : \(.[$k].Type)\nDescription : \(.[$k].Description)\nDefault : \(.[$k].Default)\nAllowedPattern : \(.[$k].AllowedPattern)\nAllowedValues : \(.[$k].AllowedValues)\n"' $input_file)" >>params_file
+                sed '/null/d' params_file >> ns_pp_output
+                echo "" >>ns_pp_output
+                echo "$resources_info_line" >>ns_pp_output
+                echo "$(jq -r '.[].Resources[] | "\n**Resource Type** ::: "+.Type+"\n**Resource Attributes**",(.Properties | keys_unsorted[] as $k | "   \($k) : \(.[$k])")' $input_file)" >>ns_resources_file
+                cat ns_resources_file | tr -d \\ >>ns_pp_output
+
+                output_params=$(jq '.[].Outputs | keys[] as $k | "\($k)"' $input_file)
+                if [[ $output_params ]]; then
+                        echo "---------------***Output Parameters Exported From Stack***----------------" >>ns_pp_output
+                        echo $output_params >>ns_pp_output
+                else
+                        echo "\n\n" >>ns_pp_output
+                        echo "***Stack does not export any output parameters***" >>ns_pp_output
+                fi
+                echo "" >>ns_pp_output
+                echo "" >>ns_pp_output
+                # format_change_output pp_output
+        fi
+
+}
+
+# this method format input jason file and invoke pretty printing process
+pretty_printing() {
+        if jq empty $2; then
+                echo "Valid json received"
+                start_pertty_printing $1 $2
+        else
+                echo "formatting file as invalid json received"
+                formatted_text=""
+                rm formatted_file
+                touch formatted_file
+                while IFS= read -r LINE || [[ -n "$LINE" ]]; do
+                        formatted_text="${formatted_text} $nl_sep ${LINE//\\/\\\\\\}"
+                done < "$2"
+                echo "file formatted"
+                echo $formatted_text >>formatted_file
+                start_pertty_printing $1 formatted_file
+        fi
+}
 
 #main starts here
 
