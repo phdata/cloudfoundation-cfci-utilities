@@ -478,8 +478,8 @@ function cfci_plan (){
 
             case $stack_action in
             A)  
-                rm ns_pp_output
-                rm ns_resources_file
+                rm -f ns_pp_output
+                rm -f ns_resources_file
                 touch ns_pp_output
                 touch ns_resources_file
                 echo "$sep_line_single STACK:$stack_name_with_ext $sep_line_single" >> A_output
@@ -507,8 +507,8 @@ function cfci_plan (){
                 ;;
             M)
                 # M=Modified stack
-                rm cs_pp_output
-                rm cs_resources_file
+                rm -f cs_pp_output
+                rm -f cs_resources_file
                 touch cs_pp_output
                 touch cs_resources_file
                 echo "$sep_line_single STACK:$stack_name_with_ext $sep_line_single" >> M_output
