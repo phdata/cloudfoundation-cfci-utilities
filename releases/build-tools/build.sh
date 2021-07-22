@@ -1173,7 +1173,7 @@ start_pertty_printing() {
 
         elif [[ $1 == "newstack" ]]; then
                 echo "newstack operations"
-                rm params_file
+                rm -f params_file
                 touch params_file
                 echo "" >>ns_pp_output
                 echo "$stack_info_line" >>ns_pp_output
@@ -1212,7 +1212,7 @@ pretty_printing() {
         else
                 echo "formatting file as invalid json received"
                 formatted_text=""
-                rm formatted_file
+                rm -f formatted_file
                 touch formatted_file
                 while IFS= read -r LINE || [[ -n "$LINE" ]]; do
                         formatted_text="${formatted_text} $nl_sep ${LINE//\\/\\\\\\}"
