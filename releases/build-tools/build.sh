@@ -483,6 +483,7 @@ function cfci_plan (){
                 touch ns_pp_output
                 touch ns_resources_file
                 echo "$sep_line_single STACK:$stack_name_with_ext $sep_line_single" >> A_output
+                echo "Before Pretty Prining" >> A_output
                 if [[ $stack_status == "\"ROLLBACK_COMPLETE\"" ]]; then
                     echo $rc_label >> A_output
                 fi
@@ -502,6 +503,8 @@ function cfci_plan (){
                 #   AllowedPattern="(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})",
                 #     switch_set_e
                 fi
+                cat output >> A_output
+                echo "After Pretty Printing" >> A_output
                 pretty_printing newstack output
                 cat ns_pp_output >> A_output
                 ;;
@@ -512,6 +515,7 @@ function cfci_plan (){
                 touch cs_pp_output
                 touch cs_resources_file
                 echo "$sep_line_single STACK:$stack_name_with_ext $sep_line_single" >> M_output
+                echo "Before pretty prinitng" >> M_output
                 if [ "$traceback" = true ];then
                     echo "Error while creating changeset for $stack_name_with_ext, Refer to the message below:" >> M_output
                     cat cs_output >> M_output
@@ -522,7 +526,8 @@ function cfci_plan (){
                     echo "Error occurred while creating the changeset, Review the log below:" >> M_output
                     cat cs_output >> M_output
                 else
-                    # cat output >> M_output
+                    cat output >> M_output
+                    echo "After Pretty Prining" >> M_output
                     # commenting this line as it is not required
                     # jq 'del(.ResponseMetadata,.CreationTime,.StackId,.ChangeSetId,.ChangeSetName)' output >> M_output
                     pretty_printing changeset output
