@@ -488,7 +488,7 @@ function cfci_plan (){
                     echo $rc_label >> A_output
                 fi
                 switch_set_e
-                sceptre --ignore-dependencies generate $stack_name_with_ext &> output
+                sceptre --ignore-dependencies --output json generate $stack_name_with_ext &> output
                 switch_set_e
                 if grep "Traceback " output ; then
                     echo "An error occured while executing generate-stack for $stack_name_with_ext, refer to below message: $nl_sep " >> A_output
