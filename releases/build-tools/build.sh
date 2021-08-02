@@ -508,7 +508,7 @@ function cfci_plan (){
                 # M=Modified stack
                 echo "" >> M_output
                 echo "" >> M_output
-                echo "$sep_line_single **$STACK:$stack_name_with_ext** $sep_line_single" >> M_output
+                echo "$sep_line_single **STACK:$stack_name_with_ext** $sep_line_single" >> M_output
                 if [ "$traceback" = true ];then
                     echo "Error while creating changeset for $stack_name_with_ext, Refer to the message below:" >> M_output
                     cat cs_output >> M_output
