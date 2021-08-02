@@ -1130,16 +1130,18 @@ fi
 
 
 # if artifact url is not valid then using the default one
-check_url(){
+check_artifact_url(){
 	if [ ! -z "$1" ]; then
 		curl "$1" >/dev/null 2>&1 
 		if [ "$?" -eq 0 ]; then
             echo "Url : $1 exists... changing not required" 
         else 
             echo "Url : $1 doesn't exists.. changing to default one"
-            artifactory_base_url="https://repository.phdata.io/artifactory/cf-gold-templates/"
+            artifactory_base_url=$artifactory_default_url
         fi
-	fi
+	else
+            artifactory_base_url=$artifactory_default_url
+    fi
 }
 
 #main starts here
@@ -1153,12 +1155,13 @@ if [[ -z "${quickstart}" ]]; then
     quickstart="false"
 fi
 
+# artifact url is valid or not
+check_artifact_url $artifactory_base_url
+
 if [ "$quickstart" = true ]; then
-    artifactory_base_url=https://repository.phdata.io/artifactory/cf-demo-templates/
+    artifactory_base_url=$artifactory_quickstart_url
 fi
 
-# artifact url is valid or not
-check_url $artifactory_base_url
 
 
 # CODEBUILD_WEBHOOK_EVENT is set only when webhooks are used, set appropriate value  for codecommit build.
