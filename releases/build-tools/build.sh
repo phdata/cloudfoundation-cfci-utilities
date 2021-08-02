@@ -480,7 +480,7 @@ function cfci_plan (){
             A)  
                 echo "" >> A_output
                 echo "" >> A_output
-                echo "***STACK:$stack_name_with_ext***" >> A_output
+                echo "$sep_line_single **STACK:$stack_name_with_ext** $sep_line_single" >> A_output
                 if [[ $stack_status == "\"ROLLBACK_COMPLETE\"" ]]; then
                     echo $rc_label >> A_output
                 fi
@@ -502,12 +502,13 @@ function cfci_plan (){
                 fi
                 # Invoking pretty printing for newstack
                 pretty_printing newstack output
+                echo "" >> output
                 ;;
             M)
                 # M=Modified stack
                 echo "" >> M_output
                 echo "" >> M_output
-                echo "***STACK:$stack_name_with_ext***" >> M_output
+                echo "$sep_line_single **$STACK:$stack_name_with_ext** $sep_line_single" >> M_output
                 if [ "$traceback" = true ];then
                     echo "Error while creating changeset for $stack_name_with_ext, Refer to the message below:" >> M_output
                     cat cs_output >> M_output
@@ -522,6 +523,7 @@ function cfci_plan (){
                     # jq 'del(.ResponseMetadata,.CreationTime,.StackId,.ChangeSetId,.ChangeSetName)' output >> M_output
                     # invoking pretty printing for changeset
                     pretty_printing changeset output
+                    echo "" >> output
                     changeset_action "delete" "$stack_name_with_ext" "$changeset_name" #delete change-set
                 fi
                 
@@ -1144,8 +1146,8 @@ fi
 start_pertty_printing() {
         input_file=$2   
 
-        parameters_info_line="***Parameters Details :::***"
-        resources_info_line="***Resources Details :::***"
+        parameters_info_line="**Parameters Details :::**"
+        resources_info_line="**Resources Details :::**"
         
         if [[ $1 == "changeset" ]]; then
                 echo "" >>M_output
@@ -1156,12 +1158,13 @@ start_pertty_printing() {
                 # Pretty printing stack Parameters
                 if grep -q "Parameters" $input_file ; then
                         echo "$parameters_info_line" >>M_output
-                        echo "$(jq -r '.Parameters[] | keys[] as $k | "\($k) : \(.[$k])"' $input_file) \n" >>M_output
+                        echo "$(jq -r '.Parameters[] | keys[] as $k | "\($k) : \(.[$k])"' $input_file)" >>M_output
                 else
                         echo "**Stack does not have any parameters**" >> M_output
                         echo "" >> M_output
                 fi
                 # Pretty printing stack resources
+                echo "" >>M_output
                 echo "$resources_info_line" >>M_output
                 echo "$(jq -r '.Changes[].ResourceChange|"\n**ResourceType** = "+.ResourceType,"Action : "+.Action,"LogicalResourceID : "+.LogicalResourceId,[.Details[]|"Target Name : "+.Target.Name,"RequiresRecreation : "+.Target.RequiresRecreation,"ChangeSource : "+.ChangeSource,"CausingEntity : "+.CausingEntity]' $input_file)" | sed '/\[\]/d' >>M_output
                 echo "" >>M_output
