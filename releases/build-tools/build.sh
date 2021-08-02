@@ -41,7 +41,6 @@ sep_line_single="------------"
 ran=$RANDOM
 descriptor_blocks=( "deploy" "undeploy" "ignore" )
 printenv
-artifactory_base_url=https://repository.phdata.io/artifactory/cf-gold-templates/
 download=true
 no_changeset=false
 pipelinename=`echo $CODEBUILD_INITIATOR | cut -d'/' -f2-`
@@ -1130,6 +1129,19 @@ fi
 }
 
 
+# if artifact url is not valid then using the default one
+check_url(){
+	if [ ! -z "$1" ]; then
+		curl "$1" >/dev/null 2>&1 
+		if [ "$?" -eq 0 ]; then
+            echo "Url : $1 exists... changing not required" 
+        else 
+            echo "Url : $1 doesn't exists.. changing to default one"
+            artifactory_base_url="https://repository.phdata.io/artifactory/cf-gold-templates/"
+        fi
+	fi
+}
+
 #main starts here
 
 # this block is for codecommit support. repo_type is set in cloudfoundation lambda function for codecommit
@@ -1144,6 +1156,9 @@ fi
 if [ "$quickstart" = true ]; then
     artifactory_base_url=https://repository.phdata.io/artifactory/cf-demo-templates/
 fi
+
+# artifact url is valid or not
+check_url $artifactory_base_url
 
 
 # CODEBUILD_WEBHOOK_EVENT is set only when webhooks are used, set appropriate value  for codecommit build.
