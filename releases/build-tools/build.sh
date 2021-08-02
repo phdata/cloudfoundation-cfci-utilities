@@ -1157,6 +1157,7 @@ start_pertty_printing() {
                 echo "" >>M_output
                 # Pretty printing stack Parameters
                 if grep -q "Parameters" $input_file ; then
+                        echo "" >>M_output
                         echo "$parameters_info_line" >>M_output
                         echo "$(jq -r '.Parameters[] | keys[] as $k | "\($k) : \(.[$k])"' $input_file)" >>M_output
                 else
@@ -1179,6 +1180,7 @@ start_pertty_printing() {
                 echo "" >>A_output
                 # Pretty printing newstack parameters
                 if grep -q "Parameters" $input_file ; then
+                        echo "" >>A_output
                         echo "$parameters_info_line" >> A_output
                         echo "$(jq -r '.[].Parameters | keys[] as $k | "Key : \($k)  \nType : \(.[$k].Type)\nDescription : \(.[$k].Description)\nDefault : \(.[$k].Default)\nAllowedPattern : \(.[$k].AllowedPattern)\nAllowedValues : \(.[$k].AllowedValues)\n"' $input_file)" | sed '/null/d' >>A_output
                 else
@@ -1187,6 +1189,7 @@ start_pertty_printing() {
                 echo "" >>A_output
                 # Pretty printing newstack resources
                 echo "$resources_info_line" >>A_output
+                echo "" >>A_output
                 echo "$(jq -r '.[].Resources[] | "**Resource Type** = "+.Type+"\n**Resource Attributes** ",.Properties' $input_file)" | tr -d \\ | tr -d '{,}' | awk NF >> A_output
                 # Adding output parameters exported from newstack
                 output_params=$(jq '.[].Outputs | keys[] as $k | "\($k)"' $input_file)
