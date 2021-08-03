@@ -349,8 +349,8 @@ validate_deployment_descriptor() {
                             cat pack_output >>  $CODEBUILD_SRC_DIR/final_output
                             exit 1
                         else
-                            mv $sam_template_name "original-$sam_template_name"
-                            mv "generated_$sam_template_name.yaml" $sam_template_name
+                            # mv $sam_template_name "original-$sam_template_name"
+                            # mv "generated_$sam_template_name.yaml" $sam_template_name
                             cd -
                         fi
                     fi
@@ -779,7 +779,7 @@ get_stack_action () {
                     changeset_action "describe" "$stack_name_with_ext" "$changeset_name"
                     if [[ $status == "FAILED" ]]; then
                         StatusReason=$(jq -r ".StatusReason" output)
-                        if [[ $StatusReason == *"t contain changes. Submit different information"* ]]; then
+                        if [[ $StatusReason == *"t contain changes. Submit different information"* || $StatusReason == "No updates are to be performed."* ]]; then
                             echo "Infrastructure is up-to-date for $1"
                             stack_action="utd" #up to date
                         fi
