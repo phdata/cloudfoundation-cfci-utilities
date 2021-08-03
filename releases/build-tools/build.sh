@@ -349,8 +349,8 @@ validate_deployment_descriptor() {
                             cat pack_output >>  $CODEBUILD_SRC_DIR/final_output
                             exit 1
                         else
-                            # mv $sam_template_name "original-$sam_template_name"
-                            # mv "generated_$sam_template_name.yaml" $sam_template_name
+                            mv $sam_template_name "original-$sam_template_name"
+                            mv "generated_$sam_template_name.yaml" $sam_template_name
                             cd -
                         fi
                     fi
