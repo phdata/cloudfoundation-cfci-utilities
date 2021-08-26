@@ -1144,7 +1144,7 @@ fi
 # 1 : stack action (changeset/newstack)
 # 2 : input file
 start_pertty_printing() {
-        input_file=$2   
+        input_file=$2
 
         parameters_info_line="**Parameters Details :::**"
         resources_info_line="**Resources Details :::**"
