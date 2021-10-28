@@ -417,7 +417,7 @@ download_artifactory_template() {
     artfct_template_ext="${template_path##*.}"  #just extension
     artfct_template_name=`echo "$artfct_template_path" | sed 's:.*/::'` #stack name without path
     # artfct_uri=$artifactory_base_url$artfct_template_path/$artfct_template_name-$template_version.$artfct_template_ext
-    artfct_uri=$artifactory_base_url/$template_version/$artfct_template_name.$artfct_template_ext
+    artfct_uri=$artifactory_base_url$template_version/$artfct_template_name.$artfct_template_ext
     echo $artfct_uri
     if check_template_exist $artfct_uri; then
         template_exist=true
