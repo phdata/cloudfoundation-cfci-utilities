@@ -378,11 +378,8 @@ pull_templates() {
 # check if template exist in artifactory. status 200 is true. else false
 check_template_exist() {
     url=$1
-    if [ "$quickstart" = true ]; then
-        check_url=$(curl -s -o /dev/null -w "%{http_code}" ${url})
-    else
-        check_url=$(curl -u$artifactory_usr:$artifactory_pwd -s -o /dev/null -w "%{http_code}" ${url})
-    fi
+    echo "check_template_exits url :: $url"
+    check_url=$(curl -s -o /dev/null -w "%{http_code}" ${url})
     echo "http_code:$check_url"
     case $check_url in
     [200]*)
