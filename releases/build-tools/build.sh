@@ -41,7 +41,7 @@ sep_line_single="------------"
 ran=$RANDOM
 descriptor_blocks=( "deploy" "undeploy" "ignore" )
 printenv
-artifactory_base_url=https://repository.phdata.io/artifactory/cf-gold-templates/
+artifactory_base_url=https://repo.phdata.io/GnDbAZqgKiD6Bpnn/cf-gold-templates/raw/versions/
 download=true
 no_changeset=false
 pipelinename=`echo $CODEBUILD_INITIATOR | cut -d'/' -f2-`
@@ -424,11 +424,7 @@ download_artifactory_template() {
         if [ "$download" = true ];then
             echo "Downloading: $artfct_uri"
             echo "using phData-gold-template: $artfct_uri"  > artf
-            if [ "$quickstart" = true ]; then
-                curl -O $artfct_uri
-            else
-                curl -u$artifactory_usr:$artifactory_pwd -O $artfct_uri
-            fi
+            curl -O $artfct_uri
             if [[ "$template_path" == *\/* ]] ; then
                 template_dir="$CODEBUILD_SRC_DIR/$project/templates/${artfct_template_path%/*}"
                 echo "template_dir :: $template_dir"
