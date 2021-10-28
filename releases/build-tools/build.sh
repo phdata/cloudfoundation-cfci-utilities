@@ -404,34 +404,41 @@ download_artifactory_template() {
     template_exist=""
     #template path from stack file
     template_path_string=`grep "template_path" config/$env/$1 | head -1`
+    echo "template_path_string :: $template_path_string"
     #template_path value from stack file
     template_path=`echo $template_path_string | cut -d':' -f2-`
     # remove line comment at the end and trim template path
+    echo "template_path :: $template_path"
     template_path=`echo ${template_path%#*} | sed -e 's/^[[:space:]]*//'`
+    echo "template_path :: $template_path"
     # if [[ "$template_name" == *\/* ]] ; then  #contains slash / in sub dir
     artfct_template_path="${template_path%.*}" #removes extension
+    echo "artfct_template_path :: $artfct_template_path"
     artfct_template_ext="${template_path##*.}"  #just extension
     artfct_template_name=`echo "$artfct_template_path" | sed 's:.*/::'` #stack name without path
-    artfct_uri=$artifactory_base_url$artfct_template_path/$artfct_template_name-$template_version.$artfct_template_ext
+    # artfct_uri=$artifactory_base_url$artfct_template_path/$artfct_template_name-$template_version.$artfct_template_ext
+    artfct_uri=$artifactory_base_url/$template_version/$artfct_template_name.$artfct_template_ext
     echo $artfct_uri
     if check_template_exist $artfct_uri; then
         template_exist=true
         if [ "$download" = true ];then
-        echo "Downloading: $artfct_uri"
-        echo "using phData-gold-template: $artfct_uri"  > artf
-        if [ "$quickstart" = true ]; then
-            curl -O $artfct_uri
-        else
-            curl -u$artifactory_usr:$artifactory_pwd -O $artfct_uri
-        fi
-        if [[ "$template_path" == *\/* ]] ; then
-        template_dir="$CODEBUILD_SRC_DIR/$project/templates/${artfct_template_path%/*}"
-        else
-        template_dir="$CODEBUILD_SRC_DIR/$project/templates"
-        fi
+            echo "Downloading: $artfct_uri"
+            echo "using phData-gold-template: $artfct_uri"  > artf
+            if [ "$quickstart" = true ]; then
+                curl -O $artfct_uri
+            else
+                curl -u$artifactory_usr:$artifactory_pwd -O $artfct_uri
+            fi
+            if [[ "$template_path" == *\/* ]] ; then
+                template_dir="$CODEBUILD_SRC_DIR/$project/templates/${artfct_template_path%/*}"
+                echo "template_dir :: $template_dir"
+            else
+                template_dir="$CODEBUILD_SRC_DIR/$project/templates"
+                echo "template-dir :: $template_dir"
+            fi
         # mkdir -p $CODEBUILD_${artfct_template_path%/*}
-        mkdir -p $template_dir
-        cp $artfct_template_name-$template_version.$artfct_template_ext $template_dir/$artfct_template_name.$artfct_template_ext
+            mkdir -p $template_dir
+            cp $artfct_template_name.$artfct_template_ext $template_dir/$artfct_template_name.$artfct_template_ext
         fi
         # ls -lhrt
     else
@@ -1142,7 +1149,8 @@ if [[ -z "${quickstart}" ]]; then
 fi
 
 if [ "$quickstart" = true ]; then
-    artifactory_base_url=https://repository.phdata.io/artifactory/cf-demo-templates/
+    # artifactory_base_url=https://repository.phdata.io/artifactory/cf-demo-templates/
+    artifactory_base_url=https://repo.phdata.io/public/cf-demo-templates/raw/versions/
 fi
 
 
