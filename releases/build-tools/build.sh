@@ -41,7 +41,7 @@ sep_line_single="------------"
 ran=$RANDOM
 descriptor_blocks=( "deploy" "undeploy" "ignore" )
 printenv
-artifactory_base_url=https://repo.phdata.io/GnDbAZqgKiD6Bpnn/cf-gold-templates/raw/versions/
+artifactory_base_url=https://repo.phdata.io/JSMaJ9zPLPT02bW0/cf-gold-templates/raw/versions/
 download=true
 no_changeset=false
 pipelinename=`echo $CODEBUILD_INITIATOR | cut -d'/' -f2-`
