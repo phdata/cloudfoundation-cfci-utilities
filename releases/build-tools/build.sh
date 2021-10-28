@@ -203,6 +203,9 @@ validate_deployment_descriptor() {
             depends_file=$(jq -r '.depends' <<< "$deploy_stack")
             SAM_build=$(jq -r '.SAM_build' <<< "$deploy_stack")
 
+            echo "deploy_stack :: $deploy_stack"
+            echo "depends_file :: $depends_file"
+
             if [ "$stack_name_with_ext" = null ] || [ "$gold" = null ] ; then
                 continue
             fi
@@ -269,9 +272,12 @@ validate_deployment_descriptor() {
                         else
                             # check if dependent stacks is listed after the stack
                             # stack_line=$(awk '/$stack_name_with_ext/{ print NR; exit }' deploy_tmp)
+                            echo "check if dependendent stacks :: $stack_name_with_ext"
                             stack_line=`grep -n ":$stack_name_with_ext" deploy_tmp | cut -d : -f 1`
+                            echo "stack_line :: $stack_line"
                             # dep_stack_line=$(awk '/$dep_stack/{ print NR; exit }' deploy_tmp)
                             dep_stack_line=`grep -n ":$dep_stack" deploy_tmp | cut -d : -f 1`
+                            echo "dep-stack_line :: $dep_stack_line"
                             if (( $dep_stack_line > $stack_line )); then
                                 if [ "$block_printed" = false ];then
                                 block_printed=true
@@ -284,7 +290,9 @@ validate_deployment_descriptor() {
                         fi
                     done < stack_graph
 
+                    echo " current stack :: $current_stack"
                     stack_name_with_ext=$current_stack
+                    
                     # check and download gold template
                     if [ "$gold" = true ] && [ "$template_version" != null ] && [ "$no_ext_stack" = false ] ; then
                             download_artifactory_template $stack_name_with_ext
@@ -295,10 +303,11 @@ validate_deployment_descriptor() {
                                 download=false
                             fi
                     fi
-
+                    echo "$depends_file"
                     # check and download depends file
                     if [ "$depends_file" != null ]; then
                         depends_artfct_uri=$artifactory_base_url$depends_file
+                        echo "depends_artfct_uri :: $depends_artfct_uri"
                         if check_template_exist $depends_artfct_uri; then
                             if [[ "$CODEBUILD_INITIATOR" == "codepipeline/"* ]]; then
                                 # depends_dir=$(echo $depends_file | sed 's|^[^/]*\(/[^/]*/\).*$|\1|')  # get string between two slashes
