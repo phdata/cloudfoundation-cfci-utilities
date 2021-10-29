@@ -48,7 +48,7 @@ codepipeline_base_url="https://console.aws.amazon.com/codesuite/codepipeline/pip
 more_details_with_appr=" $nl_sep  $nl_sep If you have a manual approval configured for this environment: $nl_sep Use the below link to approve the DEPLOY operation for this environment:  $nl_sep (Before you approve, make sure the Pipeline execution ID is matching for all stages) $nl_sep $codepipeline_base_url $nl_sep  $nl_sep BUILD Log: $nl_sep "$CODEBUILD_BUILD_URL
 note_summary="This note contains:"
 plan_all_note="As the plan_all attribute is set to true in buildspec file, DEPLOY PLAN is generated for all defined environments "
-
+artifactory_default_url="https://repo.phdata.io/JSMaJ9zPLPT02bW0/cf-gold-templates/"
 # validate deployment descriptor
 validate_deployment_descriptor() {
     # look for parse errors
@@ -377,11 +377,8 @@ pull_templates() {
 # check if template exist in artifactory. status 200 is true. else false
 check_template_exist() {
     url=$1
-    if [ "$quickstart" = true ]; then
-        check_url=$(curl -s -o /dev/null -w "%{http_code}" ${url})
-    else
-        check_url=$(curl -u$artifactory_usr:$artifactory_pwd -s -o /dev/null -w "%{http_code}" ${url})
-    fi
+    echo "check_template_exits url :: $url"
+    check_url=$(curl -s -o /dev/null -w "%{http_code}" ${url})
     echo "http_code:$check_url"
     case $check_url in
     [200]*)
@@ -411,26 +408,25 @@ download_artifactory_template() {
     artfct_template_path="${template_path%.*}" #removes extension
     artfct_template_ext="${template_path##*.}"  #just extension
     artfct_template_name=`echo "$artfct_template_path" | sed 's:.*/::'` #stack name without path
-    artfct_uri=$artifactory_base_url$artfct_template_path/$artfct_template_name-$template_version.$artfct_template_ext
+    # artfct_uri=$artifactory_base_url$artfct_template_path/$artfct_template_name-$template_version.$artfct_template_ext
+    artfct_uri=$artifactory_base_url$template_version/$artfct_template_name.$artfct_template_ext
     echo $artfct_uri
     if check_template_exist $artfct_uri; then
         template_exist=true
         if [ "$download" = true ];then
-        echo "Downloading: $artfct_uri"
-        echo "using phData-gold-template: $artfct_uri"  > artf
-        if [ "$quickstart" = true ]; then
+            echo "Downloading: $artfct_uri"
+            echo "using phData-gold-template: $artfct_uri"  > artf
             curl -O $artfct_uri
-        else
-            curl -u$artifactory_usr:$artifactory_pwd -O $artfct_uri
-        fi
-        if [[ "$template_path" == *\/* ]] ; then
-        template_dir="$CODEBUILD_SRC_DIR/$project/templates/${artfct_template_path%/*}"
-        else
-        template_dir="$CODEBUILD_SRC_DIR/$project/templates"
-        fi
+            if [[ "$template_path" == *\/* ]] ; then
+                template_dir="$CODEBUILD_SRC_DIR/$project/templates/${artfct_template_path%/*}"
+                echo "template_dir :: $template_dir"
+            else
+                template_dir="$CODEBUILD_SRC_DIR/$project/templates"
+                echo "template-dir :: $template_dir"
+            fi
         # mkdir -p $CODEBUILD_${artfct_template_path%/*}
-        mkdir -p $template_dir
-        cp $artfct_template_name-$template_version.$artfct_template_ext $template_dir/$artfct_template_name.$artfct_template_ext
+            mkdir -p $template_dir
+            cp $artfct_template_name.$artfct_template_ext $template_dir/$artfct_template_name.$artfct_template_ext
         fi
         # ls -lhrt
     else
