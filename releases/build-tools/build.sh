@@ -48,7 +48,7 @@ codepipeline_base_url="https://console.aws.amazon.com/codesuite/codepipeline/pip
 more_details_with_appr=" $nl_sep  $nl_sep If you have a manual approval configured for this environment: $nl_sep Use the below link to approve the DEPLOY operation for this environment:  $nl_sep (Before you approve, make sure the Pipeline execution ID is matching for all stages) $nl_sep $codepipeline_base_url $nl_sep  $nl_sep BUILD Log: $nl_sep "$CODEBUILD_BUILD_URL
 note_summary="This note contains:"
 plan_all_note="As the plan_all attribute is set to true in buildspec file, DEPLOY PLAN is generated for all defined environments "
-artifactory_default_url="https://repo.phdata.io/JSMaJ9zPLPT02bW0/cf-gold-templates/"
+artifactory_default_url="https://repo.phdata.io/JSMaJ9zPLPT02bW0/cf-gold-templates/raw/versions/"
 # validate deployment descriptor
 validate_deployment_descriptor() {
     # look for parse errors
