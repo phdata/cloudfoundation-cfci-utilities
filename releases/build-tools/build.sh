@@ -1123,29 +1123,12 @@ elif [ "$plan_all" = true ]; then
 fi
 }
 
-
-# if artifact url is not valid then using the default one
-check_artifact_url(){
-	if [ ! -z "$1" ]; then
-		curl "$1" >/dev/null 2>&1 
-		if [ "$?" -eq 0 ]; then
-            echo "Url : $1 exists... changing not required" 
-        else 
-            echo "URL : $1 doesn't exists.. please update the URL" >> output
-        fi
-    fi
-}
-
 #main starts here
 
 # this block is for codecommit support. repo_type is set in cloudfoundation lambda function for codecommit
 if [[ -z "${repo_type}" ]]; then
     repo_type="bitbucket"
 fi
-
-
-# artifact url is valid or not
-check_artifact_url $artifactory_base_url
 
 # CODEBUILD_WEBHOOK_EVENT is set only when webhooks are used, set appropriate value  for codecommit build.
 if [ "$repo_type" = "CODECOMMIT" ]; then
