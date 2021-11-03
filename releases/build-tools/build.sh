@@ -296,7 +296,14 @@ validate_deployment_descriptor() {
 
                     # check and download depends file
                     if [ "$depends_file" != null ]; then
-                        depends_artfct_uri=$artifactory_base_url$depends_file
+                        IFS='/ ' read -r -a array <<< "$line"
+                        depends_file_name="${array[1]}"
+                        echo "depends_file_name :: $depends_file_name"
+                        depends_file_version="${array[2]%.*}"
+                        echo "depends_file_version :: $depends_file_version"
+                        depends_file_version_ext="${array[2]##*.}"  #just extension
+                        echo "artfct_template_ext :: $artfct_template_ext"
+                        depends_artfct_uri=$artifactory_base_url$depends_file_version/$depends_file_name.$depends_file_version_ext
                         if check_template_exist $depends_artfct_uri; then
                             if [[ "$CODEBUILD_INITIATOR" == "codepipeline/"* ]]; then
                                 # depends_dir=$(echo $depends_file | sed 's|^[^/]*\(/[^/]*/\).*$|\1|')  # get string between two slashes
@@ -307,7 +314,7 @@ validate_deployment_descriptor() {
                                 aws s3api head-object --bucket $lambda_src_bucket --key $depends_file
                                 if [[ $? -ne 0 ]]; then
                                     mkdir -p $depends_dir
-                                    cd $depends_dir && { curl -u$artifactory_usr:$artifactory_pwd -O $depends_artfct_uri ; cd -; }
+                                    cd $depends_dir && { curl -O $depends_artfct_uri ; cd -; }
                                     aws s3 cp $depends_dir/$depends_file_name s3://$lambda_src_bucket/$depends_file
                                     if [ $? = 0 ]; then
                                         echo "s3://$lambda_src_bucket/$depends_file  upload is successful"
