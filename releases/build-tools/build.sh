@@ -298,11 +298,8 @@ validate_deployment_descriptor() {
                     if [ "$depends_file" != null ]; then
                         IFS='/ ' read -r -a array <<< "$depends_file"
                         depends_file_name="${array[1]}"
-                        echo "depends_file_name :: $depends_file_name"
                         depends_file_version="${array[2]%.*}"
-                        echo "depends_file_version :: $depends_file_version"
                         depends_file_version_ext="${array[2]##*.}"  #just extension
-                        echo "artfct_template_ext :: $artfct_template_ext"
                         depends_artfct_uri=$artifactory_base_url$depends_file_version/$depends_file_name.$depends_file_version_ext
                         if check_template_exist $depends_artfct_uri; then
                             if [[ "$CODEBUILD_INITIATOR" == "codepipeline/"* ]]; then
