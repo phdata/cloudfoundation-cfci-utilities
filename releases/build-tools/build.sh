@@ -296,7 +296,7 @@ validate_deployment_descriptor() {
 
                     # check and download depends file
                     if [ "$depends_file" != null ]; then
-                        IFS='/ ' read -r -a array <<< "$line"
+                        IFS='/ ' read -r -a array <<< "$depends_file"
                         depends_file_name="${array[1]}"
                         echo "depends_file_name :: $depends_file_name"
                         depends_file_version="${array[2]%.*}"
