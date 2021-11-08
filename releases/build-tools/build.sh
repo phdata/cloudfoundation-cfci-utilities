@@ -47,7 +47,8 @@ pipelinename=`echo $CODEBUILD_INITIATOR | cut -d'/' -f2-`
 codepipeline_base_url="https://console.aws.amazon.com/codesuite/codepipeline/pipelines/$pipelinename/view?region=$AWS_DEFAULT_REGION"
 more_details_with_appr=" $nl_sep  $nl_sep If you have a manual approval configured for this environment: $nl_sep Use the below link to approve the DEPLOY operation for this environment:  $nl_sep (Before you approve, make sure the Pipeline execution ID is matching for all stages) $nl_sep $codepipeline_base_url $nl_sep  $nl_sep BUILD Log: $nl_sep "$CODEBUILD_BUILD_URL
 note_summary="This note contains:"
-plan_all_note="As the plan_all attribute is set to true in buildspec file, DEPLOY PLAN is generated for all defined environments "
+plan_all_note="As the plan_all attribute is set to true in buildspec file, DEPLOY PLAN is generated for all defined environments"
+repository_base_url="${repository_base_url/TOKEN/$cloudsmith_entitlement_token}"
 # validate deployment descriptor
 validate_deployment_descriptor() {
     # look for parse errors
@@ -299,9 +300,9 @@ validate_deployment_descriptor() {
                         IFS='/ ' read -r -a array <<< "$depends_file"
                         depends_file_name="${array[1]}"
                         depends_file_version="${array[2]%.*}"
-                        depends_file_version_ext="${array[2]##*.}"  #just extension
-                        depends_artfct_uri=$artifactory_base_url$depends_file_version/$depends_file_name.$depends_file_version_ext
-                        if check_template_exist $depends_artfct_uri; then
+                        depends_file_ext="${array[2]##*.}"  #just extension
+                        depends_artfct_uri=$repository_base_url/$depends_file_version/$depends_file_name.$depends_file_ext
+                        if is_package_available $depends_file_name.$depends_file_ext $depends_file_version; then
                             if [[ "$CODEBUILD_INITIATOR" == "codepipeline/"* ]]; then
                                 # depends_dir=$(echo $depends_file | sed 's|^[^/]*\(/[^/]*/\).*$|\1|')  # get string between two slashes
                                 depends_dir=`basename $(dirname "${depends_file}")`  # relative path of zipfile
@@ -378,6 +379,19 @@ pull_templates() {
 }
 
 # check if template exist in artifactory. status 200 is true. else false
+is_package_available () {
+    package_output=$(cloudsmith list packages phdata/$cloudsmith_repository_name -q "name:$1 AND version:$2")
+    echo "$package_output"
+    if [[ $package_output == *"0 packages visible"* ]]; then
+        echo "Package not found"
+        return 1 # 1 = false
+    else
+        echo "package available to download"
+        return 0 # 0 = true
+    fi
+}
+
+# check if template exist in artifactory. status 200 is true. else false
 check_template_exist() {
     url=$1
     echo "check_template_exits url :: $url"
@@ -411,10 +425,10 @@ download_artifactory_template() {
     artfct_template_path="${template_path%.*}" #removes extension
     artfct_template_ext="${template_path##*.}"  #just extension
     artfct_template_name=`echo "$artfct_template_path" | sed 's:.*/::'` #stack name without path
-    # artfct_uri=$artifactory_base_url$artfct_template_path/$artfct_template_name-$template_version.$artfct_template_ext
-    artfct_uri=$artifactory_base_url$template_version/$artfct_template_name.$artfct_template_ext
+    # artfct_uri=$repository_base_url$artfct_template_path/$artfct_template_name-$template_version.$artfct_template_ext
+    artfct_uri=$repository_base_url/$template_version/$artfct_template_name.$artfct_template_ext
     echo $artfct_uri
-    if check_template_exist $artfct_uri; then
+    if is_package_available $artfct_template_name.$artfct_template_ext $template_version ; then
         template_exist=true
         if [ "$download" = true ];then
             echo "Downloading: $artfct_uri"
