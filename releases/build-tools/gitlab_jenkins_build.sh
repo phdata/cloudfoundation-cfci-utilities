@@ -45,8 +45,9 @@ no_changeset=false
 pipelinename=`echo $CODEBUILD_INITIATOR | cut -d'/' -f2-`
 more_details_with_appr="  $nl_sep BUILD Log:  $nl_sep "$BUILD_URL"console"
 note_summary="This note contains:"
-plan_all_note="As the plan_all attribute is set to true in Jenkinsfile, DEPLOY PLAN is generated for all defined environments "
-
+plan_all_note="As the plan_all attribute is set to true in buildspec file, DEPLOY PLAN is generated for all defined environments"
+repository_base_url="${repository_base_url/TOKEN/$cloudsmith_entitlement_token}"
+repository_base_url="$repository_base_url/$cloudsmith_repository_name/raw/versions"
 # validate deployment descriptor
 validate_deployment_descriptor() {
     # look for parse errors
@@ -297,8 +298,12 @@ validate_deployment_descriptor() {
 
                     # check and download depends file
                     if [ "$depends_file" != null ]; then
-                        depends_artfct_uri=$artifactory_base_url$depends_file
-                        if check_template_exist $depends_artfct_uri; then
+                        IFS='/ ' read -r -a array <<< "$depends_file"
+                        depends_file_name="${array[1]}"
+                        depends_file_version="${array[2]%.*}"
+                        depends_file_ext="${array[2]##*.}"  #just extension
+                        depends_artfct_uri=$repository_base_url/$depends_file_version/$depends_file_name.$depends_file_ext
+                        if is_package_available $depends_file_name.$depends_file_ext $depends_file_version; then
                             if [[ "$CODEBUILD_INITIATOR" == "codepipeline/"* ]]; then
                                 # depends_dir=$(echo $depends_file | sed 's|^[^/]*\(/[^/]*/\).*$|\1|')  # get string between two slashes
                                 depends_dir=`basename $(dirname "${depends_file}")`  # relative path of zipfile
@@ -308,7 +313,7 @@ validate_deployment_descriptor() {
                                 aws s3api head-object --bucket $lambda_src_bucket --key $depends_file
                                 if [[ $? -ne 0 ]]; then
                                     mkdir -p $depends_dir
-                                    cd $depends_dir && { curl -u$artifactory_usr:$artifactory_pwd -O $depends_artfct_uri ; cd -; }
+                                    cd $depends_dir && { curl -O $depends_artfct_uri ; cd -; }
                                     aws s3 cp $depends_dir/$depends_file_name s3://$lambda_src_bucket/$depends_file
                                     if [ $? = 0 ]; then
                                         echo "s3://$lambda_src_bucket/$depends_file  upload is successful"
@@ -375,6 +380,19 @@ pull_templates() {
 }
 
 # check if template exist in artifactory. status 200 is true. else false
+is_package_available () {
+    package_output=$(cloudsmith list packages phdata/$cloudsmith_repository_name -q "name:$1 AND version:$2")
+    echo "$package_output"
+    if [[ $package_output == *"0 packages visible"* ]]; then
+        echo "Package not found"
+        return 1 # 1 = false
+    else
+        echo "package available to download"
+        return 0 # 0 = true
+    fi
+}
+
+# check if template exist in artifactory. status 200 is true. else false
 check_template_exist() {
     url=$1
     if [ "$quickstart" = true ]; then
@@ -411,26 +429,25 @@ download_artifactory_template() {
     artfct_template_path="${template_path%.*}" #removes extension
     artfct_template_ext="${template_path##*.}"  #just extension
     artfct_template_name=`echo "$artfct_template_path" | sed 's:.*/::'` #stack name without path
-    artfct_uri=$artifactory_base_url$artfct_template_path/$artfct_template_name-$template_version.$artfct_template_ext
+    # artfct_uri=$repository_base_url$artfct_template_path/$artfct_template_name-$template_version.$artfct_template_ext
+    artfct_uri=$repository_base_url/$template_version/$artfct_template_name.$artfct_template_ext
     echo $artfct_uri
-    if check_template_exist $artfct_uri; then
+    if is_package_available $artfct_template_name.$artfct_template_ext $template_version ; then
         template_exist=true
         if [ "$download" = true ];then
-        echo "Downloading: $artfct_uri"
-        echo "using phData-gold-template: $artfct_uri"  > artf
-        if [ "$quickstart" = true ]; then
+            echo "Downloading: $artfct_uri"
+            echo "using phData-gold-template: $artfct_uri"  > artf
             curl -O $artfct_uri
-        else
-            curl -u$phdata_artifactory_user:$phdata_artifactory_secret -O $artfct_uri
-        fi
-        if [[ "$template_path" == *\/* ]] ; then
-        template_dir="$WORKSPACE/$project/templates/${artfct_template_path%/*}"
-        else
-        template_dir="$WORKSPACE/$project/templates"
-        fi
+            if [[ "$template_path" == *\/* ]] ; then
+                template_dir="$CODEBUILD_SRC_DIR/$project/templates/${artfct_template_path%/*}"
+                echo "template_dir :: $template_dir"
+            else
+                template_dir="$CODEBUILD_SRC_DIR/$project/templates"
+                echo "template-dir :: $template_dir"
+            fi
         # mkdir -p $CODEBUILD_${artfct_template_path%/*}
-        mkdir -p $template_dir
-        cp $artfct_template_name-$template_version.$artfct_template_ext $template_dir/$artfct_template_name.$artfct_template_ext
+            mkdir -p $template_dir
+            cp $artfct_template_name.$artfct_template_ext $template_dir/$artfct_template_name.$artfct_template_ext
         fi
         # ls -lhrt
     else
