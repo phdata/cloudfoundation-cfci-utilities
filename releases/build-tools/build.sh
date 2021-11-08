@@ -47,8 +47,8 @@ pipelinename=`echo $CODEBUILD_INITIATOR | cut -d'/' -f2-`
 codepipeline_base_url="https://console.aws.amazon.com/codesuite/codepipeline/pipelines/$pipelinename/view?region=$AWS_DEFAULT_REGION"
 more_details_with_appr=" $nl_sep  $nl_sep If you have a manual approval configured for this environment: $nl_sep Use the below link to approve the DEPLOY operation for this environment:  $nl_sep (Before you approve, make sure the Pipeline execution ID is matching for all stages) $nl_sep $codepipeline_base_url $nl_sep  $nl_sep BUILD Log: $nl_sep "$CODEBUILD_BUILD_URL
 note_summary="This note contains:"
-plan_all_note="As the plan_all attribute is set to true in buildspec file, DEPLOY PLAN is generated for all defined environments "
-
+plan_all_note="As the plan_all attribute is set to true in buildspec file, DEPLOY PLAN is generated for all defined environments"
+repository_base_url="${repository_base_url/TOKEN/$cloudsmith_entitlement_token}"
 # validate deployment descriptor
 validate_deployment_descriptor() {
     # look for parse errors
@@ -290,14 +290,18 @@ validate_deployment_descriptor() {
                             if [ "$template_exist" = false ];then
                                 echo "" >> descriptor_errors
                                 echo "**$block:$deploy_stack**" >> descriptor_errors
-                                echo "ERROR:Requested gold template version doesn't exist, update the template version in deployment descriptor." >> descriptor_errors
+                                echo "ERROR:Requested gold template version doesn't exist, check whether the template details and repository url mentioned correctly." >> descriptor_errors
                                 download=false
                             fi
                     fi
 
                     # check and download depends file
                     if [ "$depends_file" != null ]; then
-                        depends_artfct_uri=$artifactory_base_url$depends_file
+                        IFS='/ ' read -r -a array <<< "$depends_file"
+                        depends_file_name="${array[1]}"
+                        depends_file_version="${array[2]%.*}"
+                        depends_file_ext="${array[2]##*.}"  #just extension
+                        depends_artfct_uri=$repository_base_url/$depends_file_version/$depends_file_name.$depends_file_ext
                         if check_template_exist $depends_artfct_uri; then
                             if [[ "$CODEBUILD_INITIATOR" == "codepipeline/"* ]]; then
                                 # depends_dir=$(echo $depends_file | sed 's|^[^/]*\(/[^/]*/\).*$|\1|')  # get string between two slashes
@@ -308,7 +312,7 @@ validate_deployment_descriptor() {
                                 aws s3api head-object --bucket $lambda_src_bucket --key $depends_file
                                 if [[ $? -ne 0 ]]; then
                                     mkdir -p $depends_dir
-                                    cd $depends_dir && { curl -u$artifactory_usr:$artifactory_pwd -O $depends_artfct_uri ; cd -; }
+                                    cd $depends_dir && { curl -O $depends_artfct_uri ; cd -; }
                                     aws s3 cp $depends_dir/$depends_file_name s3://$lambda_src_bucket/$depends_file
                                     if [ $? = 0 ]; then
                                         echo "s3://$lambda_src_bucket/$depends_file  upload is successful"
@@ -377,11 +381,7 @@ pull_templates() {
 # check if template exist in artifactory. status 200 is true. else false
 check_template_exist() {
     url=$1
-    if [ "$quickstart" = true ]; then
-        check_url=$(curl -s -o /dev/null -w "%{http_code}" ${url})
-    else
-        check_url=$(curl -u$artifactory_usr:$artifactory_pwd -s -o /dev/null -w "%{http_code}" ${url})
-    fi
+    check_url=$(curl -s -o /dev/null -w "%{http_code}" ${url})
     echo "http_code:$check_url"
     case $check_url in
     [200]*)
@@ -411,26 +411,25 @@ download_artifactory_template() {
     artfct_template_path="${template_path%.*}" #removes extension
     artfct_template_ext="${template_path##*.}"  #just extension
     artfct_template_name=`echo "$artfct_template_path" | sed 's:.*/::'` #stack name without path
-    artfct_uri=$artifactory_base_url$artfct_template_path/$artfct_template_name-$template_version.$artfct_template_ext
+    # artfct_uri=$repository_base_url$artfct_template_path/$artfct_template_name-$template_version.$artfct_template_ext
+    artfct_uri=$repository_base_url/$template_version/$artfct_template_name.$artfct_template_ext
     echo $artfct_uri
-    if check_template_exist $artfct_uri; then
+    if check_template_exist $artfct_uri ; then
         template_exist=true
         if [ "$download" = true ];then
-        echo "Downloading: $artfct_uri"
-        echo "using phData-gold-template: $artfct_uri"  > artf
-        if [ "$quickstart" = true ]; then
+            echo "Downloading: $artfct_uri"
+            echo "using phData-gold-template: $artfct_uri"  > artf
             curl -O $artfct_uri
-        else
-            curl -u$artifactory_usr:$artifactory_pwd -O $artfct_uri
-        fi
-        if [[ "$template_path" == *\/* ]] ; then
-        template_dir="$CODEBUILD_SRC_DIR/$project/templates/${artfct_template_path%/*}"
-        else
-        template_dir="$CODEBUILD_SRC_DIR/$project/templates"
-        fi
+            if [[ "$template_path" == *\/* ]] ; then
+                template_dir="$CODEBUILD_SRC_DIR/$project/templates/${artfct_template_path%/*}"
+                echo "template_dir :: $template_dir"
+            else
+                template_dir="$CODEBUILD_SRC_DIR/$project/templates"
+                echo "template-dir :: $template_dir"
+            fi
         # mkdir -p $CODEBUILD_${artfct_template_path%/*}
-        mkdir -p $template_dir
-        cp $artfct_template_name-$template_version.$artfct_template_ext $template_dir/$artfct_template_name.$artfct_template_ext
+            mkdir -p $template_dir
+            cp $artfct_template_name.$artfct_template_ext $template_dir/$artfct_template_name.$artfct_template_ext
         fi
         # ls -lhrt
     else
@@ -1128,41 +1127,12 @@ elif [ "$plan_all" = true ]; then
 fi
 }
 
-
-# if artifact url is not valid then using the default one
-check_artifact_url(){
-	if [ ! -z "$1" ]; then
-		curl "$1" >/dev/null 2>&1 
-		if [ "$?" -eq 0 ]; then
-            echo "Url : $1 exists... changing not required" 
-        else 
-            echo "Url : $1 doesn't exists.. changing to default one"
-            artifactory_base_url=$artifactory_default_url
-        fi
-	else
-            artifactory_base_url=$artifactory_default_url
-    fi
-}
-
 #main starts here
 
 # this block is for codecommit support. repo_type is set in cloudfoundation lambda function for codecommit
 if [[ -z "${repo_type}" ]]; then
     repo_type="bitbucket"
 fi
-
-if [[ -z "${quickstart}" ]]; then
-    quickstart="false"
-fi
-
-# artifact url is valid or not
-check_artifact_url $artifactory_base_url
-
-if [ "$quickstart" = true ]; then
-    artifactory_base_url=$artifactory_quickstart_url
-fi
-
-
 
 # CODEBUILD_WEBHOOK_EVENT is set only when webhooks are used, set appropriate value  for codecommit build.
 if [ "$repo_type" = "CODECOMMIT" ]; then
