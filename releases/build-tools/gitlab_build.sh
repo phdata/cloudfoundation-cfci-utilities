@@ -47,7 +47,6 @@ more_details_with_appr=" $nl_sep  $nl_sep Use the below link to approve the DEPL
 note_summary="This note contains:"
 plan_all_note="As the plan_all attribute is set to true in buildspec file, DEPLOY PLAN is generated for all defined environments"
 repository_base_url="${repository_base_url/TOKEN/$cloudsmith_entitlement_token}"
-repository_base_url="$repository_base_url/$cloudsmith_repository_name/raw/versions"
 # validate deployment descriptor
 validate_deployment_descriptor() {
     # look for parse errors
@@ -289,7 +288,7 @@ validate_deployment_descriptor() {
                             if [ "$template_exist" = false ];then
                                 echo "" >> descriptor_errors
                                 echo "**$block:$deploy_stack**" >> descriptor_errors
-                                echo "ERROR:Requested gold template version doesn't exist, update the template version in deployment descriptor." >> descriptor_errors
+                                echo "ERROR:Requested gold template version doesn't exist, check whether the template details and repository url mentioned correctly." >> descriptor_errors
                                 download=false
                             fi
                     fi
@@ -301,7 +300,7 @@ validate_deployment_descriptor() {
                         depends_file_version="${array[2]%.*}"
                         depends_file_ext="${array[2]##*.}"  #just extension
                         depends_artfct_uri=$repository_base_url/$depends_file_version/$depends_file_name.$depends_file_ext
-                        if is_package_available $depends_file_name.$depends_file_ext $depends_file_version; then
+                        if check_template_exist $depends_artfct_uri; then
                             if [[ "$CODEBUILD_INITIATOR" == "codepipeline/"* ]]; then
                                 # depends_dir=$(echo $depends_file | sed 's|^[^/]*\(/[^/]*/\).*$|\1|')  # get string between two slashes
                                 depends_dir=`basename $(dirname "${depends_file}")`  # relative path of zipfile
@@ -378,26 +377,9 @@ pull_templates() {
 }
 
 # check if template exist in artifactory. status 200 is true. else false
-is_package_available () {
-    package_output=$(cloudsmith list packages phdata/$cloudsmith_repository_name -q "name:$1 AND version:$2")
-    echo "$package_output"
-    if [[ $package_output == *"0 packages visible"* ]]; then
-        echo "Package not found"
-        return 1 # 1 = false
-    else
-        echo "package available to download"
-        return 0 # 0 = true
-    fi
-}
-
-# check if template exist in artifactory. status 200 is true. else false
 check_template_exist() {
     url=$1
-    if [ "$quickstart" = true ]; then
-        check_url=$(curl -s -o /dev/null -w "%{http_code}" ${url})
-    else
-        check_url=$(curl -u$artifactory_usr:$artifactory_pwd -s -o /dev/null -w "%{http_code}" ${url})
-    fi
+    check_url=$(curl -s -o /dev/null -w "%{http_code}" ${url})
     echo "http_code:$check_url"
     case $check_url in
     [200]*)
@@ -430,7 +412,7 @@ download_artifactory_template() {
     # artfct_uri=$repository_base_url$artfct_template_path/$artfct_template_name-$template_version.$artfct_template_ext
     artfct_uri=$repository_base_url/$template_version/$artfct_template_name.$artfct_template_ext
     echo $artfct_uri
-    if is_package_available $artfct_template_name.$artfct_template_ext $template_version ; then
+    if check_template_exist $artfct_uri ; then
         template_exist=true
         if [ "$download" = true ];then
             echo "Downloading: $artfct_uri"
