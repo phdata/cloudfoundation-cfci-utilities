@@ -303,7 +303,7 @@ validate_deployment_descriptor() {
                         depends_file_version="${array[2]%.*}"
                         depends_file_ext="${array[2]##*.}"  #just extension
                         depends_artfct_uri=$repository_base_url/$depends_file_version/$depends_file_name.$depends_file_ext
-                        if is_package_available $depends_file_name.$depends_file_ext $depends_file_version; then
+                        if check_template_exist $depends_artfct_uri; then
                             if [[ "$CODEBUILD_INITIATOR" == "codepipeline/"* ]]; then
                                 # depends_dir=$(echo $depends_file | sed 's|^[^/]*\(/[^/]*/\).*$|\1|')  # get string between two slashes
                                 depends_dir=`basename $(dirname "${depends_file}")`  # relative path of zipfile
@@ -395,11 +395,7 @@ is_package_available () {
 # check if template exist in artifactory. status 200 is true. else false
 check_template_exist() {
     url=$1
-    if [ "$quickstart" = true ]; then
-        check_url=$(curl -s -o /dev/null -w "%{http_code}" ${url})
-    else
-        check_url=$(curl -u$artifactory_usr:$artifactory_pwd -s -o /dev/null -w "%{http_code}" ${url})
-    fi
+    check_url=$(curl -s -o /dev/null -w "%{http_code}" ${url})
     echo "http_code:$check_url"
     case $check_url in
     [200]*)
@@ -432,7 +428,7 @@ download_artifactory_template() {
     # artfct_uri=$repository_base_url$artfct_template_path/$artfct_template_name-$template_version.$artfct_template_ext
     artfct_uri=$repository_base_url/$template_version/$artfct_template_name.$artfct_template_ext
     echo $artfct_uri
-    if is_package_available $artfct_template_name.$artfct_template_ext $template_version ; then
+    if check_template_exist $artfct_uri ; then
         template_exist=true
         if [ "$download" = true ];then
             echo "Downloading: $artfct_uri"
