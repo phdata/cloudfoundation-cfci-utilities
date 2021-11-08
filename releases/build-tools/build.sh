@@ -49,6 +49,7 @@ more_details_with_appr=" $nl_sep  $nl_sep If you have a manual approval configur
 note_summary="This note contains:"
 plan_all_note="As the plan_all attribute is set to true in buildspec file, DEPLOY PLAN is generated for all defined environments"
 repository_base_url="${repository_base_url/TOKEN/$cloudsmith_entitlement_token}"
+repository_base_url="$repository_base_url/$cloudsmith_repository_name/raw/versions"
 # validate deployment descriptor
 validate_deployment_descriptor() {
     # look for parse errors
