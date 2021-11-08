@@ -1176,7 +1176,10 @@ start_pertty_printing() {
                 echo "" >>A_output
                 # Adding templateformatversion and description
                 echo "AWSTemplateFormatVersion :  $(jq -r '.[].AWSTemplateFormatVersion' $input_file)" >>A_output
-                echo "Description :  $(jq -r '.[].Description' $input_file)" >>A_output
+                description=$(jq '.[].Description' $input_file)
+                if ! [[ $description == "null" ]]; then
+                        echo "Description :  $description" >>A_output
+                fi
                 echo "" >>A_output
                 # Pretty printing newstack parameters
                 if grep -q "Parameters" $input_file ; then
