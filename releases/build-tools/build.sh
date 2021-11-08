@@ -49,7 +49,6 @@ more_details_with_appr=" $nl_sep  $nl_sep If you have a manual approval configur
 note_summary="This note contains:"
 plan_all_note="As the plan_all attribute is set to true in buildspec file, DEPLOY PLAN is generated for all defined environments"
 repository_base_url="${repository_base_url/TOKEN/$cloudsmith_entitlement_token}"
-repository_base_url="$repository_base_url/$cloudsmith_repository_name/raw/versions"
 # validate deployment descriptor
 validate_deployment_descriptor() {
     # look for parse errors
@@ -291,7 +290,7 @@ validate_deployment_descriptor() {
                             if [ "$template_exist" = false ];then
                                 echo "" >> descriptor_errors
                                 echo "**$block:$deploy_stack**" >> descriptor_errors
-                                echo "ERROR:Requested gold template version doesn't exist, update the template version in deployment descriptor." >> descriptor_errors
+                                echo "ERROR:Requested gold template version doesn't exist, check whether the template details and repository url mentioned correctly." >> descriptor_errors
                                 download=false
                             fi
                     fi
@@ -377,19 +376,6 @@ pull_templates() {
     # code to pull all templates first after descriptor validation
     # Then run sceptre status? # not manadtory as 
     echo "dummy method for now"
-}
-
-# check if template exist in artifactory. status 200 is true. else false
-is_package_available () {
-    package_output=$(cloudsmith list packages phdata/$cloudsmith_repository_name -q "name:$1 AND version:$2")
-    echo "$package_output"
-    if [[ $package_output == *"0 packages visible"* ]]; then
-        echo "Package not found"
-        return 1 # 1 = false
-    else
-        echo "package available to download"
-        return 0 # 0 = true
-    fi
 }
 
 # check if template exist in artifactory. status 200 is true. else false
