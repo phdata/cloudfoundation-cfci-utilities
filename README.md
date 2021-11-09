@@ -4,7 +4,7 @@ phData cloudfoundation cfci(CloudFoundation Continuous Integration) build script
 # Release Notes
 ## 1.2.5
 ### Changes
-* Changes to download gold templates from cloudsmith artifactory.
+* Changes to migrate gold templates from artifactory to cloudsmith.
 
 ## 1.2.4
 ### Changes
