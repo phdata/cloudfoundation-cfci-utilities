@@ -2,6 +2,12 @@
 phData cloudfoundation cfci(CloudFoundation Continuous Integration) build scripts, Refer to our documentation at https://docs.customer.phdata.io/docs/cloudfoundation/ to know more about this tool
 
 # Release Notes
+## 1.2.5
+### Changes
+* Changes to support downloading templates from cloudsmith.
+* Rading repository base url from buildspec.file
+
+
 ## 1.2.4
 ### Changes
 * Changes to support continuous deployments for lambda functions.
