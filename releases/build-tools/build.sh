@@ -475,13 +475,15 @@ function cfci_plan (){
             fi
 
             case $stack_action in
-            A)
-                echo "$sep_line_single STACK:$stack_name_with_ext $sep_line_single" >> A_output
+            A)  
+                echo "" >> A_output
+                echo "" >> A_output
+                echo "$sep_line_single **STACK:$stack_name_with_ext** $sep_line_single" >> A_output
                 if [[ $stack_status == "\"ROLLBACK_COMPLETE\"" ]]; then
                     echo $rc_label >> A_output
                 fi
                 switch_set_e
-                sceptre --ignore-dependencies generate $stack_name_with_ext &> output
+                sceptre --ignore-dependencies --output json generate $stack_name_with_ext &> output
                 switch_set_e
                 if grep "Traceback " output ; then
                     echo "An error occured while executing generate-stack for $stack_name_with_ext, refer to below message: $nl_sep " >> A_output
@@ -496,10 +498,15 @@ function cfci_plan (){
                 #   AllowedPattern="(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})",
                 #     switch_set_e
                 fi
-                cat output >> A_output
+                # Invoking pretty printing for newstack
+                pretty_printing newstack output
+                echo "" >> output
                 ;;
             M)
-                echo "$sep_line_single STACK:$stack_name_with_ext $sep_line_single" >> M_output
+                # M=Modified stack
+                echo "" >> M_output
+                echo "" >> M_output
+                echo "$sep_line_single **STACK:$stack_name_with_ext** $sep_line_single" >> M_output
                 if [ "$traceback" = true ];then
                     echo "Error while creating changeset for $stack_name_with_ext, Refer to the message below:" >> M_output
                     cat cs_output >> M_output
@@ -510,8 +517,11 @@ function cfci_plan (){
                     echo "Error occurred while creating the changeset, Review the log below:" >> M_output
                     cat cs_output >> M_output
                 else
-                    # cat output >> M_output
-                    jq 'del(.ResponseMetadata,.CreationTime,.StackId,.ChangeSetId,.ChangeSetName)' output >> M_output
+                    # commenting this line as it is not required
+                    # jq 'del(.ResponseMetadata,.CreationTime,.StackId,.ChangeSetId,.ChangeSetName)' output >> M_output
+                    # invoking pretty printing for changeset
+                    pretty_printing changeset output
+                    echo "" >> output
                     changeset_action "delete" "$stack_name_with_ext" "$changeset_name" #delete change-set
                 fi
                 
@@ -1125,6 +1135,98 @@ elif [ "$plan_all" = true ]; then
     # format_change_output plan_comments
     post_pr_comment "$prefix $nl_sep $multi_env_label $nl_sep $plan_all_note $nl_sep $note_summary $nl_sep  $nl_sep $plan_comments $nl_sep  $nl_sep $more_details"
 fi
+}
+
+# It will start pretty printing for changeset created for existing updated/newstack is created
+# Two input parameters will be passed to this method
+# 1 : stack action (changeset/newstack)
+# 2 : input file
+start_pertty_printing() {
+        input_file=$2
+
+        parameters_info_line="**Parameters Details :::**"
+        resources_info_line="**Resources Details :::**"
+        
+        if [[ $1 == "changeset" ]]; then
+                echo "" >>M_output
+                # Printing stack execution and changeset status
+                echo "ExecutionStatus : $(jq -r '.ExecutionStatus' $input_file $nl_sep)" >>M_output
+                echo "ChangesetStatus : $(jq -r '.Status ' $input_file)" >>M_output
+                echo "" >>M_output
+                # Pretty printing stack Parameters
+                if grep -q "Parameters" $input_file ; then
+                        echo "" >>M_output
+                        echo "$parameters_info_line" >>M_output
+                        echo "$(jq -r '.Parameters[] | keys[] as $k | "\($k) : \(.[$k])"' $input_file)" >>M_output
+                else
+                        echo "**Stack does not have any parameters**" >> M_output
+                        echo "" >> M_output
+                fi
+                # Pretty printing stack resources
+                echo "" >>M_output
+                echo "$resources_info_line" >>M_output
+                echo "$(jq -r '.Changes[].ResourceChange|"\n**ResourceType** = "+.ResourceType,"Action : "+.Action,"LogicalResourceID : "+.LogicalResourceId,[.Details[]|"Target Name : "+.Target.Name,"RequiresRecreation : "+.Target.RequiresRecreation,"ChangeSource : "+.ChangeSource,"CausingEntity : "+.CausingEntity]' $input_file)" | sed '/\[\]/d' >>M_output
+                echo "" >>M_output
+                echo "" >>M_output
+
+        elif [[ $1 == "newstack" ]]; then
+                echo "newstack operations"
+                echo "" >>A_output
+                # Adding templateformatversion and description
+                echo "AWSTemplateFormatVersion :  $(jq -r '.[].AWSTemplateFormatVersion' $input_file)" >>A_output
+                description=$(jq '.[].Description' $input_file)
+                if ! [[ $description == "null" ]]; then
+                        echo "Description :  $description" >>A_output
+                fi
+                echo "" >>A_output
+                # Pretty printing newstack parameters
+                if grep -q "Parameters" $input_file ; then
+                        echo "" >>A_output
+                        echo "$parameters_info_line" >> A_output
+                        echo "$(jq -r '.[].Parameters | keys[] as $k | "Key : \($k)  \nType : \(.[$k].Type)\nDescription : \(.[$k].Description)\nDefault : \(.[$k].Default)\nAllowedPattern : \(.[$k].AllowedPattern)\nAllowedValues : \(.[$k].AllowedValues)\n"' $input_file)" | sed '/null/d' >>A_output
+                else
+                        echo "**Stack does not have any parameters**" >> A_output
+                fi
+                echo "" >>A_output
+                # Pretty printing newstack resources
+                echo "$resources_info_line" >>A_output
+                echo "" >>A_output
+                echo "$(jq -r '.[].Resources[] | "**Resource Type** = "+.Type+"\n**Resource Attributes** ",.Properties' $input_file)" | tr -d \\ | tr -d '{,}' | awk NF >> A_output
+                # Adding output parameters exported from newstack
+                output_params=$(jq '.[].Outputs | keys[] as $k | "\($k)"' $input_file)
+                if [[ $output_params ]]; then
+                        echo "**Output Parameters Exported From Stack**" >>A_output
+                        echo $output_params >>A_output
+                else
+                        echo "\n\n" >>A_output
+                        echo "**Stack does not export any output parameters**" >>A_output
+                fi
+                echo "" >>A_output
+                echo "" >>A_output
+        fi
+
+}
+
+# Input file will be validate and initial sceptre pretty printing
+pretty_printing() {
+        echo "in pretty printing method"
+        set +e
+        if jq empty $2; then
+                echo "Valid json received"
+                start_pertty_printing $1 $2
+        else
+                echo "formatting file as invalid json received"
+                formatted_text=""
+                rm -f formatted_file
+                touch formatted_file
+                while IFS= read -r LINE || [[ -n "$LINE" ]]; do
+                        formatted_text="${formatted_text} $nl_sep ${LINE//\\/\\\\\\}"
+                done < "$2"
+                echo "file formatted"
+                echo $formatted_text >>formatted_file
+                start_pertty_printing $1 formatted_file
+        fi
+        set -e
 }
 
 #main starts here
