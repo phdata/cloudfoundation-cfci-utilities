@@ -38,7 +38,6 @@ sep_line_single="------------"
 ran=$RANDOM
 descriptor_blocks=( "deploy" "undeploy" "ignore" )
 # printenv
-artifactory_base_url=https://repository.phdata.io/artifactory/cf-gold-templates/
 download=true
 no_changeset=false
 pipelinename=`echo $CODEBUILD_INITIATOR | cut -d'/' -f2-`
@@ -46,7 +45,7 @@ codepipeline_base_url="https://console.aws.amazon.com/codesuite/codepipeline/pip
 more_details_with_appr=" $nl_sep  $nl_sep Use the below link to approve the DEPLOY operation for this environment:  $nl_sep $CI_PIPELINE_URL $nl_sep $nl_sep BUILD Log:  $nl_sep "$CI_JOB_URL
 note_summary="This note contains:"
 plan_all_note="As the plan_all attribute is set to true in buildspec file, DEPLOY PLAN is generated for all defined environments"
-repository_base_url="${repository_base_url/TOKEN/$cloudsmith_entitlement_token}"
+repository_base_url="${repository_base_url/TOKEN/$cloudfoundation_token}"
 # validate deployment descriptor
 validate_deployment_descriptor() {
     # look for parse errors
@@ -1096,14 +1095,6 @@ fi
 # after script runs in seperate context, so load variables from before and script sections
 if [ "$stage" = "post_build" ]; then
     source variables_file
-fi
-
-if [[ -z "${quickstart}" ]]; then
-    quickstart="false"
-fi
-
-if [ "$quickstart" = true ]; then
-    artifactory_base_url=https://repository.phdata.io/artifactory/cf-demo-templates/
 fi
 
 if [ "$stage" = "build" ]; then

@@ -39,14 +39,13 @@ sep_line_single="------------"
 ran=$RANDOM
 descriptor_blocks=( "deploy" "undeploy" "ignore" )
 # printenv
-artifactory_base_url=https://repository.phdata.io/artifactory/cf-gold-templates/
 download=true
 no_changeset=false
 pipelinename=`echo $CODEBUILD_INITIATOR | cut -d'/' -f2-`
 more_details_with_appr="  $nl_sep BUILD Log:  $nl_sep "$BUILD_URL"console"
 note_summary="This note contains:"
 plan_all_note="As the plan_all attribute is set to true in buildspec file, DEPLOY PLAN is generated for all defined environments"
-repository_base_url="${repository_base_url/TOKEN/$cloudsmith_entitlement_token}"
+repository_base_url="${repository_base_url/TOKEN/$cloudfoundation_token}"
 # validate deployment descriptor
 validate_deployment_descriptor() {
     # look for parse errors
@@ -1070,14 +1069,6 @@ touch $WORKSPACE/variables_file
 # after script runs in seperate context, so load variables from before and script sections
 if [ "$stage" = "post_build" ]; then
     source $WORKSPACE/variables_file
-fi
-
-if [[ -z "${quickstart}" ]]; then
-    quickstart="false"
-fi
-
-if [ "$quickstart" = true ]; then
-    artifactory_base_url=https://repository.phdata.io/artifactory/cf-demo-templates/
 fi
 
 if [ "$stage" = "build" ]; then
