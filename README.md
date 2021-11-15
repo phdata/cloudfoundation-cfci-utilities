@@ -2,10 +2,6 @@
 phData cloudfoundation cfci(CloudFoundation Continuous Integration) build scripts, Refer to our documentation at https://docs.customer.phdata.io/docs/cloudfoundation/ to know more about this tool
 
 # Release Notes
-## 1.2.6
-### Changes
-* Changes to improving the sceptre generate command output.
-
 ## 1.2.5
 ### Changes
 * Changes to migrate gold templates from artifactory to cloudsmith.
