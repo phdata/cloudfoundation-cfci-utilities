@@ -1,13 +1,13 @@
-#!/bin/bash -x
+#!/bin/bash
 
 #  Copyright 2018 phData Inc.
-# 
+#
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
 #  You may obtain a copy of the License at
-# 
+#
 #  http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 #  Unless required by applicable law or agreed to in writing, software
 #  distributed under the License is distributed on an "AS IS" BASIS,
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -15,8 +15,11 @@
 #  limitations under the License.
 
 
-#shell options 
+#shell options
 set -e
+if [ "${trace-}" = "true" ]; then
+  set -x
+fi
 
 # variables/ labels
 prefix="phData-CFCI build: "
@@ -74,7 +77,7 @@ validate_deployment_descriptor() {
         echo "Build has identified below issues with deployment descriptor, please review and fix." >> output
         # echo "" >> output
         cat descriptor_errors >> output
-        exit 1 
+        exit 1
      fi
 
     no_ext_stack=false
@@ -101,14 +104,14 @@ validate_deployment_descriptor() {
                 echo "ERROR: stackname along with extension(yaml) must be specified in the deployment descriptor." >> descriptor_errors
                 continue
             fi
-            
+
             echo ":$stack_name_with_ext" >> "$block"_tmp
 
             if [[ $block == "deploy" ]];then
                 no_ext_stack=false
                 block_printed=false
                 # echo $stack_name_with_ext >> "$block"_tmp
-                # check if name, phdata_gold_template and version attributes are set correctly  
+                # check if name, phdata_gold_template and version attributes are set correctly
                 if [ "$gold" = null ] ; then
                     if [ "$block_printed" = false ];then
                         block_printed=true
@@ -180,7 +183,7 @@ validate_deployment_descriptor() {
             echo "Build has identified below issues with deployment descriptor, please review and fix." >> output
             # echo "" >> output
             cat descriptor_errors >> output
-            exit 1 
+            exit 1
          fi
         download=false
     else
@@ -197,7 +200,8 @@ validate_deployment_descriptor() {
             gold=$(jq -r '.phdata_gold_template' <<< "$deploy_stack")
             gold=`echo "$gold" | tr '[:upper:]' '[:lower:]'`  #switch to lower case
             template_version=$(jq -r '.version' <<< "$deploy_stack")
-  
+            depends_file=$(jq -r '.depends' <<< "$deploy_stack")
+
             if [ "$stack_name_with_ext" = null ] || [ "$gold" = null ] ; then
                 continue
             fi
@@ -210,7 +214,7 @@ validate_deployment_descriptor() {
             do
                 if [ "$sub_block" == "$block" ]; then
                     continue
-                else    
+                else
                     if grep ":$stack_name_with_ext" "$sub_block"_tmp ; then
                         if [ ! -f "descriptor_errors" ]; then
                             touch descriptor_errors
@@ -222,10 +226,10 @@ validate_deployment_descriptor() {
                             echo "$stack_name_with_ext is listed in block:$block and block:$sub_block" >> descriptor_errors
                             download=false
                         fi
-                    fi  
+                    fi
                 fi
             done
-        
+
             if [[ $block == "deploy" ]] && [ "$no_ext_stack" = false ] ; then
                 block_printed=false
 
@@ -242,15 +246,16 @@ validate_deployment_descriptor() {
                 if [ "$env_status" -eq 0 ]  || [ "$all_status" -eq 0 ]; then
                     # check if dependent stacks are listed for a stack
                     cd ..
+                    current_stack="${stack_name_with_ext}"
                     python graph.py $project $env "$env/${stack_name_with_ext%.*}"
+                    cat stack_graph
                     cp stack_graph $project
                     cd $project
                     while read -r dep_stack
                     do
-                    
                         if ! grep -q ":$dep_stack" deploy_tmp ; then
                             no_changeset=true
-                            get_stack_action ${dep_stack%.*} $block
+                            get_stack_action $env/${dep_stack%.*} $block
                             no_changeset=false
                             if [[ $stack_action = "A" ]]; then
                                 if [ "$block_printed" = false ];then
@@ -258,7 +263,7 @@ validate_deployment_descriptor() {
                                     echo "" >> descriptor_errors
                                     echo "**$block:$deploy_stack**" >> descriptor_errors
                                 fi
-                            echo "ERROR:Stack $stack_name_with_ext has a dependent stack: $dep_stack, which is not listed in deployment descriptor." >> descriptor_errors
+                            echo "ERROR:Stack $current_stack has a dependent stack: $dep_stack, which is not listed in deployment descriptor." >> descriptor_errors
                             fi
                         else
                             # check if dependent stacks is listed after the stack
@@ -272,12 +277,13 @@ validate_deployment_descriptor() {
                                 echo "" >> descriptor_errors
                                 echo "**$block:$deploy_stack**" >> descriptor_errors
                                 fi
-                            echo "ERROR:Stack $stack_name_with_ext has a dependent stack: $dep_stack, which is listed after $stack_name_with_ext in the deployment descriptor." >> descriptor_errors
+                            echo "ERROR:Stack $current_stack has a dependent stack: $dep_stack, which is listed after $stack_name_with_ext in the deployment descriptor." >> descriptor_errors
                             # echo "" >> descriptor_errors
                             fi
                         fi
                     done < stack_graph
 
+                    stack_name_with_ext=$current_stack
                     # check and download gold template
                     if [ "$gold" = true ] && [ "$template_version" != null ] && [ "$no_ext_stack" = false ] ; then
                             download_artifactory_template $stack_name_with_ext
@@ -288,8 +294,30 @@ validate_deployment_descriptor() {
                                 download=false
                             fi
                     fi
-                fi
 
+                    # check and download depends file
+                    if [ "$depends_file" != null ]; then
+                        depends_artfct_uri=$artifactory_base_url$depends_file
+                        if check_template_exist $depends_artfct_uri; then
+                            if [[ "$CODEBUILD_INITIATOR" == "codepipeline/"* ]]; then
+                                depends_dir=$(echo $depends_file | sed 's|^[^/]*\(/[^/]*/\).*$|\1|')  # get string between two slashes
+                                depends_file_name=${depends_file##*/}
+                                lambda_src_bucket=$(yq -r  .template_bucket_name config/$env/config.yaml)
+                                mkdir -p .$depends_dir
+                                cd .$depends_dir && { curl -u$artifactory_usr:$artifactory_pwd -O $depends_artfct_uri ; cd -; }
+                                aws s3 cp .$depends_dir$depends_file_name s3://$lambda_src_bucket/$depends_file
+                                if [ $? = 0 ]; then
+                                    echo "s3://$lambda_src_bucket/$depends_file  upload is successful"
+                                else
+                                    echo "ERROR while uploading dependency file: $depends_file to bucket:$lambda_src_bucket" >> descriptor_errors
+                                fi
+                            fi
+                        else
+                            echo "ERROR:Requested dependency file: $depends_file doesnt exist in phData repository." >> descriptor_errors
+                        fi
+                    fi
+
+                fi
             fi
 
         done < $block
@@ -299,13 +327,13 @@ validate_deployment_descriptor() {
         echo "Build has identified below issues with deployment descriptor, please review and fix." >> output
         echo "" >> output
         cat descriptor_errors >> output
-        exit 1 
+        exit 1
      fi
 }
 
 pull_templates() {
     # code to pull all templates first after descriptor validation
-    # Then run sceptre status? # not manadtory as 
+    # Then run sceptre status? # not manadtory as
     echo "dummy method for now"
 }
 
@@ -394,11 +422,11 @@ function cfci_plan (){
     for block in "${descriptor_blocks[@]}"
     do
         while read -r deploy_stack
-        do  
+        do
             echo "$deploy_stack"
             stack_name_with_ext=$(jq -r '.name' <<< "$deploy_stack")
             stack="${stack_name_with_ext%.*}" #remove extenstion - for stack
-            
+
             #check if deploy_env contains current env OR all
             check_if_deploy_requested
 
@@ -440,7 +468,7 @@ function cfci_plan (){
                     echo "Error while creating changeset for $stack_name_with_ext, Refer to the message below:" >> M_output
                     cat cs_output >> M_output
                 elif [ "$status" == "Traceback" ] || [ "$status" == "error" ] ; then
-                    echo "Error occurred while describing the changeset, Review the log below:" >> M_output 
+                    echo "Error occurred while describing the changeset, Review the log below:" >> M_output
                     cat output >> M_output
                 elif [ "$status" == "nochangeset" ]; then
                     echo "Error occurred while creating the changeset, Review the log below:" >> M_output
@@ -450,15 +478,15 @@ function cfci_plan (){
                     jq 'del(.ResponseMetadata,.CreationTime,.StackId,.ChangeSetId,.ChangeSetName)' output >> M_output
                     changeset_action "delete" "$stack_name_with_ext" "$changeset_name" #delete change-set
                 fi
-                
+
                 ;;
-            utd) 
+            utd)
                 echo "$stack_name_with_ext ---- Infrastructure is up-to-date." >> utd_output
                 changeset_action "delete" "$stack_name_with_ext" "$changeset_name" #delete change-set
                 ;;
-            D | ND) 
+            D | ND)
                 # echo "$sep_line_single STACK:$stack_name_with_ext $sep_line_single" >> D_output
-                
+
                 if [[ $stack_action == "ND" ]]; then
                     echo "$stack_name_with_ext ---- IGNORED: Undeploy requested, but stack is not deployed" >> O_output
                 else
@@ -472,20 +500,20 @@ function cfci_plan (){
                     sed \$d tmp_output > output
                     if grep "Traceback " output ; then
                         echo "An error occured while executing generate-stack for $stack_name_with_ext, refer to below message: $nl_sep " >> D_output
-                    # else 
+                    # else
                     #     jq 'del(.[].Outputs,.[].Parameters)' output >> D_output
                     fi
                 cat output >> D_output
                 fi
                 ;;
-            IGN | env_IGN) 
+            IGN | env_IGN)
                 if [[ $stack_action == "env_IGN" ]]; then
                     echo "$stack_name_with_ext ---- IGNORED, Deploy not requested for environment: $env " >> O_output
                 else
                     echo "$stack_name_with_ext ---- IGNORED:No action will be performed by build" >> O_output
                 fi
                 ;;
-            *) 
+            *)
                 echo "$stack_name_with_ext ---- No action will be performed by build" >> O_output
                 ;;
             esac
@@ -558,7 +586,7 @@ function cfci_deploy (){
         # cd ..
         # python graph_$cfci_version.py $project $env "$stack"
         # cat stack_graph
-        
+
         # cp stack_graph $project
         # cd $project
 
@@ -573,11 +601,11 @@ function cfci_deploy (){
         switch_set_e
 
         if [[ $block == "ignore" ]]; then
-            stack_action="IGN"                
+            stack_action="IGN"
         elif [ "$env_status" -eq 0 ]  || [ "$all_status" -eq 0 ]; then
             get_stack_action $env/$stack $block
         else
-            stack_action="env_IGN"  
+            stack_action="env_IGN"
         fi
 
         case $stack_action in
@@ -598,7 +626,7 @@ function cfci_deploy (){
                     sceptre --no-colour create -y "$stack_name_with_ext" &>> output
                     switch_set_e
                 fi
-                
+
                 if grep "Traceback " output ; then
                     echo "An error occured while executing stack $stack_to_run.yaml, refer to below message: $nl_sep " >> stack_log
                 fi
@@ -615,13 +643,14 @@ function cfci_deploy (){
                 elif [ "$status" == "nochangeset" ]; then
                     echo "Error occurred while creating the changeset, Review the log below:" >> stack_log
                     cat cs_output >> stack_log
-                else 
+                    cat output >> stack_log
+                else
                     switch_set_e
                     sceptre --no-colour --ignore-dependencies execute -y "$stack_name_with_ext" "$changeset_name" &> output
                     switch_set_e
                     cat output >> stack_log
                 fi
-                changeset_action "delete" "$stack_name_with_ext" "$changeset_name" #delete change-set
+                # changeset_action "delete" "$stack_name_with_ext" "$changeset_name" #delete change-set
                 ;;
             utd)
                 echo "$stack_name_with_ext ---- No changes, Infrastructure is up-to-date." >> upd_stack_log
@@ -641,14 +670,14 @@ function cfci_deploy (){
                     cat output >> stack_log
                 fi
                 ;;
-            IGN | env_IGN) 
+            IGN | env_IGN)
                 if [[ $stack_action == "env_IGN" ]]; then
                     echo "$stack_name_with_ext ---- IGNORED, Deploy not requested for environment: $env " >> o_stack_log
                 else
                     echo "$stack_name_with_ext ---- IGNORED:No action performed by build" >> o_stack_log
                 fi
                 ;;
-            *) 
+            *)
                 echo "$stack_name_with_ext ---- No action performed by build" >> o_stack_log
                 ;;
         esac
@@ -738,25 +767,29 @@ changeset_action() {
     do
         switch_set_e
         if [ "$1" = "describe" ]; then
-            sceptre --no-colour --ignore-dependencies describe change-set -v $2 $3 &> output
+            sceptre --no-colour --output json --ignore-dependencies describe change-set -v $2 $3 &> output
         elif [ "$1" = "delete" ]; then
-            sceptre --no-colour describe change-set $2 $3 &> output
+            sceptre --no-colour --output json describe change-set $2 $3 &> output
         fi
         switch_set_e
+        echo "cat output"
+        cat output
         if grep "Traceback " output ; then
             status="Traceback"
         elif grep "ChangeSet.* does not exist" output ; then
             status="nochangeset"
         elif grep "An error occurred" output ; then
             status="error"
-        else 
+        else
             status=$(jq -r ".Status" output)
         fi
+        echo "status is::$CREATE_IN_PROGRESS"
         case $status in
         *"CREATE_IN_PROGRESS"*)
             sleep 3
             let i+=3
-            if [ $i -ge 300 ];then break 
+            echo "CREATE_IN_PROGRESS"
+            if [ $i -ge 300 ];then break
             fi
             ;;
         *"Traceback"* | *"error"*)
@@ -769,7 +802,8 @@ changeset_action() {
             ;;
         *"FAILED"* | *"CREATE_COMPLETE"*)
             if [ "$1" = "delete" ]; then
-                sceptre --no-colour delete -y $2 $3
+                echo "No delete temporarily"
+                # sceptre --no-colour delete -y $2 $3x
             fi
             break
             ;;
@@ -786,7 +820,7 @@ format_change_output () {
         do
         #temp fix to escape special char's handle it in a  better way later
         # LINE=$(sed -E 's/\//\\\//g' <<<"${LINE}") #escape /
-        LINE=$(sed -E 's/\\/\\\\/g' <<<"${LINE}") #escape \ 
+        LINE=$(sed -E 's/\\/\\\\/g' <<<"${LINE}") #escape \
         if [ "$repo_type" = "bitbucket" ] || [ "$repo_type" = "github" ] ; then
             stack_changes="${stack_changes} $nl_sep ${LINE//\"/\\\"}" #add esc char for " and append to string
         else
@@ -830,22 +864,22 @@ stack_status_report() {
     if grep "Dependency cycle detected" stack_status_report ; then
         echo $dependency_label > output
         cat stack_status_report >> output
-        exit 1 
+        exit 1
     elif grep "Traceback " stack_status_report ; then
         echo $syntax_err_label > output
         echo "" >> output
         cat stack_status_report >> output
-        exit 1 
+        exit 1
     elif grep "An error occurred" stack_status_report ; then
         echo $syntax_err_label > output
         echo "" >> output
         cat stack_status_report >> output
-        exit 1 
+        exit 1
     elif grep "'dict object' has no attribute" stack_status_report ; then
         echo $syntax_err_label > output
         echo "" >> output
         cat stack_status_report >> output
-        exit 1 
+        exit 1
     fi
     sed -i.bak '/Request limit exceeded/d' stack_status_report && rm -f stack_status_report.bak
     cat stack_status_report
@@ -853,7 +887,7 @@ stack_status_report() {
 
 #post comment to PR
 post_pr_comment() {
-    
+
     if [ "$repo_type" = "CODECOMMIT" ]; then
         echo "$1" > comments
         awk '{gsub(/\\n/,"\n")}1' comments > newlinecomment
@@ -876,10 +910,10 @@ post_pr_comment() {
          -X POST -d '{"body": "'"${1//$'\n'/'\n'}"'"}' \
          "$github_api_url/$owner_repo/issues/$pr_id/comments"
     fi
-    
+
 }
 
-#decline PR 
+#decline PR
 decline_pr() {
     curl --silent -u $bb_app_user:$bb_app_pwd $api_url/$repo_path/pullrequests/$1/decline \
         --request POST > /dev/null
@@ -892,9 +926,9 @@ get_new_stack_count() {
 
 switch_set_e() {
 set_state=$-
-if [[ $set_state =~ e ]]; then 
+if [[ $set_state =~ e ]]; then
     set +e
-else 
+else
     set -e
 fi
 }
@@ -912,17 +946,17 @@ get_pr_details() {
                     -H "Accept: application/vnd.github.groot-preview+json" \
                     -H "Authorization: token ${access_token}" \
                     $github_api_url/$owner_repo/commits/$CODEBUILD_RESOLVED_SOURCE_VERSION/pulls | jq -r '.[].number'`
-        else 
+        else
             pr_id=`sed -e 's#.*/\(\)#\1#' <<< "$CODEBUILD_SOURCE_VERSION"`
         fi
     fi
 }
 
 # configure aws environment
-# arg: "caller" - switch aws env to caller account where the pipeline is configured 
+# arg: "caller" - switch aws env to caller account where the pipeline is configured
 # No arg - then if $env exist configure the next env from deploy_environments else set the matching env for deploy_environment which is defined as codepipeline env variable
 configure_aws_environment() {
-   
+
     # account where the build is configured
     if [ -z "$caller_account" ];then
         # export ORIG_ACCOUNT=$caller_account
@@ -930,7 +964,7 @@ configure_aws_environment() {
         aws sts assume-role --role-arn arn:aws:iam::$caller_account:role/cloudfoundation-admin --role-session-name cloufoundationAdmin > sts_caller.json
     fi
 
-    # if fun() arg is "caller" switch to original account/caller where the pipeline is configured 
+    # if fun() arg is "caller" switch to original account/caller where the pipeline is configured
     if [ "$1" == "caller" ];then
         export_aws_var sts_caller.json
         return
@@ -950,13 +984,13 @@ configure_aws_environment() {
 
     if [ -z "$env" ];then
         while read -r environment
-        do  
+        do
             env_name=$(jq -r '.name' <<< "$environment")
             account_id=$(jq -r '.account_id' <<< "$environment")
             # region=$(jq -r '.region' <<< "$environment")
-            
+
             # deploy_environment is set in codepipeline, basically this condition is check if build triggered by webhook OR pipeline
-            # if deploy_environment is not set the build is triggered by webhooks 
+            # if deploy_environment is not set the build is triggered by webhooks
             if [[ -z "${deploy_environment}" ]]; then
                 if [[ "$CODEBUILD_INITIATOR" == "codepipeline/"* ]]; then
                     echo "BUILD Error: you must set deploy_environment environment variable when you have multiple environments in your pipeline" > output
@@ -978,7 +1012,7 @@ configure_aws_environment() {
         do
         env_name=$(jq -r '.name' <<< "$environment")
         account_id=$(jq -r '.account_id' <<< "$environment")
-        
+
         if [ "$current_env" = true ];then
             next_env=true
             break
@@ -1035,7 +1069,7 @@ if [ "$plan_all" = false ] || [ "$env_count" -lt 2 ] ; then
 elif [ "$plan_all" = true ]; then
     index=0
     while read -r environment
-    do  
+    do
         env_name=$(jq -r '.name' <<< "$environment")
         account_id=$(jq -r '.account_id' <<< "$environment")
         configure_aws_environment "env"
@@ -1097,7 +1131,7 @@ if [ "$stage" = "build" ]; then
 
     # get stack status and validate deployment descriptor
     stack_status_report
-    validate_deployment_descriptor 
+    validate_deployment_descriptor
 
     previous_env_detail=$env_detail
     previous_env_separator="============================ENVIRONMENT:$env============================"
@@ -1106,7 +1140,7 @@ if [ "$stage" = "build" ]; then
     if [[ "$CODEBUILD_INITIATOR" == "codepipeline/"* ]]; then
         get_pr_details
         cfci_deploy
-        
+
         # Switch to caller account
         configure_aws_environment "caller"
 
@@ -1115,7 +1149,7 @@ if [ "$stage" = "build" ]; then
         if [ "$next_env" = true ]; then
             echo "" >> stack_log
             echo "" >> stack_log
-            
+
             # echo $env_separator >> stack_log
             # echo "" >> stack_log
             stack_status_report
@@ -1129,7 +1163,7 @@ if [ "$stage" = "build" ]; then
             note_summary="$note_summary  $nl_sep 1) DEPLOY SUMMARY for environment: $env"
             post_pr_comment "$prefix $nl_sep $env_detail $nl_sep $note_summary $nl_sep $deploy_comment $nl_sep $stack_changes $nl_sep $more_details"
         fi
-    else    
+    else
      # for src code repos supporting webhooks, get CODEBUILD_WEBHOOK_EVENT (supported types: PULL_REQUEST_UPDATED | PULL_REQUEST_CREATED)
         case $CODEBUILD_WEBHOOK_EVENT in
             PULL_REQUEST_UPDATED | PULL_REQUEST_CREATED | PULL_REQUEST_REOPENED)
@@ -1149,9 +1183,9 @@ if [ "$stage" = "build" ]; then
                             exit 1
                         elif [ "$pr_status" == "OPEN" ] || [ "$pr_status" == "Open" ] ; then
                             process_plan
-                        fi  
+                        fi
                     fi
-                else 
+                else
                     echo "no action performed by BUILD"
                 fi
                 ;;

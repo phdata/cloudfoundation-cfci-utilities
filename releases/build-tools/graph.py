@@ -46,7 +46,7 @@ get_dep(response,sys.argv[3])
 # stack_list.append(sys.argv[3])
 
 if os.path.exists("stack_graph"):
-      os.remove("stack_graph")
+    os.remove("stack_graph")
       
 with open('stack_graph', 'w') as f:
     for item in stack_list:
